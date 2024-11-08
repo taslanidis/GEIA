@@ -1,0 +1,6 @@
+numpy
+torch==1.10.2
+sentence-transformers==2.2.0
+transformers>=4.0.0,<5.0.0
+simcse==0.4
+datasets
