@@ -10,6 +10,7 @@ __pycache__/
 data.zip
 data/abcd/
 data/personachat/personachat_self_original.json
+model_weights
 
 # Distribution / packaging
 .Python
