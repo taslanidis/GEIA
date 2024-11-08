@@ -11,6 +11,7 @@ data.zip
 data/abcd/
 data/personachat/personachat_self_original.json
 model_weights
+data_real
 
 # Distribution / packaging
 .Python
