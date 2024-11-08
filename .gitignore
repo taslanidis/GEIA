@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# DATA
+data.zip
+data/abcd/
+data/personachat/personachat_self_original.json
+
 # Distribution / packaging
 .Python
 build/
