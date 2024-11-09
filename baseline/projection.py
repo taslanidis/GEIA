@@ -1,6 +1,6 @@
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import torch
 import torch.nn as nn
@@ -12,7 +12,12 @@ import pandas as pd
 import argparse
 import sys
 
-sys.path.append('..')
+# Get the directory containing projection.py
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Add parent directory to Python path
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from pprint import pprint
 
 from transformers import AutoModel, AutoTokenizer
@@ -211,6 +216,11 @@ def train_sent(dataloader, model_name, embed_model_dim, config):
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
     save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
 
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    
+    print(f'save_path:{save_path}')
+
     hx = torch.zeros(64, 512).cuda()
     for i in range(num_epochs):
 
@@ -248,6 +258,10 @@ def train_simcse(dataloader, model_name, embed_model_dim, config):
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
     save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    
     print(f'save_path:{save_path}')
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModel.from_pretrained(model_name).to(device)
@@ -510,7 +524,8 @@ if __name__ == '__main__':
     config['data_type'] = args.data_type
     config['embed_model'] = args.embed_model
     config['model_type'] = args.model_type
-    
+    config['threshold'] = 0.3
+
     config['device'] = torch.device("cuda")
     config['tokenizer'] = AutoTokenizer.from_pretrained('microsoft/DialoGPT-medium')
     config['eos_token'] = config['tokenizer'].eos_token
@@ -525,6 +540,6 @@ if __name__ == '__main__':
                             collate_fn=dataset.collate,
                             drop_last=True)
     # for training
-    get_embedding(dataloader, config, eval=False)
+    # get_embedding(dataloader, config, eval=False)
     # for evaluation
     get_embedding(dataloader, config, eval=True)
