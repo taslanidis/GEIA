@@ -1,0 +1,19 @@
+name: null
+
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - code-server=4.23.1
+  - cudatoolkit-dev=11.3
+  # - gcc_linux-64=12.1.0
+  # - gxx_linux-64=12.1.0
+  - pip
+
+variables:
+  CUDA_HOME: "'$CONDA_PREFIX'"
+  # AM_I_DOCKER: "'False'"
+  # BUILD_WITH_CUDA: "'True'"
+  # CUDA_HOME: "'$CUDA_HOME'"
+  # LD_LIBRARY_PATH: "'$LD_LIBRARY_PATH:$CONDA_PREFIX/lib/'"

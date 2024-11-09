@@ -1,0 +1,43 @@
+#!/bin/bash 
+#SBATCH --partition=gpu_mig
+#SBATCH --gpus=1
+#SBATCH --gpus-per-node=1
+#SBATCH --job-name=DownloadBaselineWeights
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=00:55:00
+#SBATCH --output=download_baseline_weights-%A.out
+
+
+set -e
+
+module purge
+# module load 2023
+# module load p7zip/17.04-GCCcore-12.3.0
+
+PROJECT_DIR="$PWD"
+
+#save the weights in the scratch-shared folder
+mkdir -p /scratch-shared/${USER}/
+
+mkdir -p /scratch-shared/${USER}/baseline_weights
+
+cd /scratch-shared/${USER}/baseline_weights
+
+rm -rf *
+
+git lfs install
+
+git clone https://huggingface.co/microsoft/DialoGPT-medium
+
+git clone https://huggingface.co/openai-community/gpt2-large
+
+# cp -r */*.tif ./
+
+# rm -rf */
+
+# rm -rf *.zip
+
+#symbolic link to the weights
+cd $PROJECT_DIR
+ln -s /scratch-shared/${USER}/baseline_weights/
