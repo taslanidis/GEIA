@@ -1,8 +1,6 @@
 import os
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-USER = os.environ.get('USER') 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import torch
 import torch.nn as nn
@@ -13,6 +11,7 @@ import numpy as np
 import pandas as pd
 import argparse
 import sys
+import tqdm
 
 # Get the directory containing projection.py
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -213,8 +212,7 @@ def get_embedding(dataloader, config, eval=False):
 def train_sent(dataloader, model_name, embed_model_dim, config):
     device = config['device']
     num_epochs = config['num_epochs']
-    os.makedirs(f'/scratch-shared/{USER}/sentence_transformers', exist_ok=True)
-    model = SentenceTransformer(model_name, device=device, cache_folder=f'/scratch-shared/{USER}/sentence_transformers')
+    model = SentenceTransformer(model_name, device=device)
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
     save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
@@ -225,9 +223,9 @@ def train_sent(dataloader, model_name, embed_model_dim, config):
     print(f'save_path:{save_path}')
 
     hx = torch.zeros(64, 512).cuda()
-    for i in range(num_epochs):
+    for i in tqdm(range(num_epochs), desc="Epochs"):
 
-        for idx, batch in enumerate(dataloader):
+        for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
             # print(batch)
             batch_text, batch_label = batch
             # print(batch_label)
@@ -272,8 +270,8 @@ def train_simcse(dataloader, model_name, embed_model_dim, config):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModel.from_pretrained(model_name).to(device)
     hx = torch.zeros(64, 512).cuda()
-    for i in range(num_epochs):
-        for idx, batch in enumerate(dataloader):
+    for i in tqdm(range(num_epochs), desc="Epochs"):
+        for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
             batch_text, batch_label = batch
             batch_label = torch.tensor(batch_label)
             batch_label = batch_label.to(device)
@@ -326,8 +324,7 @@ def report_score(y_true, y_pred):
 def eval_sent(dataloader, model_name, embed_model_dim, config):
     device = config['device']
     num_epochs = config['num_epochs']
-    os.makedirs(f'/scratch-shared/{USER}/sentence_transformers', exist_ok=True) 
-    model = SentenceTransformer(model_name, device=device, cache_folder=f'/scratch-shared/{USER}/sentence_transformers')
+    model = SentenceTransformer(model_name, device=device)
     type = config['model_type']
     hx = torch.zeros(64, 512).cuda()
 
@@ -344,7 +341,7 @@ def eval_sent(dataloader, model_name, embed_model_dim, config):
     predict = []
     ground_truth = []
     input_text = []
-    for idx, batch in enumerate(dataloader):
+    for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
         # print(batch)
         batch_text, batch_label = batch
         batch_label = torch.tensor(batch_label)
@@ -391,7 +388,7 @@ def eval_simcse(dataloader, model_name, embed_model_dim, config):
     predict = []
     ground_truth = []
     input_text = []
-    for idx, batch in enumerate(dataloader):
+    for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
         batch_text, batch_label = batch
         batch_label = torch.tensor(batch_label)
         batch_label = batch_label.to(device)
@@ -554,7 +551,17 @@ if __name__ == '__main__':
                             collate_fn=dataset.collate,
                             drop_last=True)
     # for training
-    if config["data_type"] == "train":
+    if config['data_type'] == 'train':
         get_embedding(dataloader, config, eval=False)
     # for evaluation
+    config['data_type'] = 'test'
+    sent_list = get_sent_list(config)
+
+    #dataset = sent_list_dataset(sent_list, onehot_labels)
+    dataset = collated_dataset(sent_list,config)
+    dataloader = DataLoader(dataset=dataset,
+                            shuffle=False,
+                            batch_size=config['batch_size'],
+                            collate_fn=dataset.collate,
+                            drop_last=True)
     get_embedding(dataloader, config, eval=True)
