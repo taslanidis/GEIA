@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=00:55:00
-#SBATCH --output=$HOME/GEIA/output/%/install_env_locally-%A.out
+#SBATCH --output=output/install_env_locally-%A.out
 
 # entire script fails if a single command fails
 set -e
