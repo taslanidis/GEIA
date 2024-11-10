@@ -1,41 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-CUDA available: True
-CUDA device count: 1
-CUDA device name: NVIDIA A100-SXM4-40GB
-/gpfs/home2/scur2861/GEIA/attacker_models.py:136: SyntaxWarning: "is" with a literal. Did you mean "=="?
-  if reduce is "batch":
-Generating train split:   0%|          | 0/104743 [00:00<?, ? examples/s]Generating train split:  74%|███████▍  | 78000/104743 [00:00<00:00, 762055.39 examples/s]Generating train split: 100%|██████████| 104743/104743 [00:00<00:00, 810901.97 examples/s]
-Generating validation split:   0%|          | 0/5463 [00:00<?, ? examples/s]Generating validation split: 100%|██████████| 5463/5463 [00:00<00:00, 816996.46 examples/s]
-Generating test split:   0%|          | 0/5463 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 5463/5463 [00:00<00:00, 836624.90 examples/s]
-/gpfs/home2/scur2861/GEIA/.env/lib/python3.9/site-packages/huggingface_hub/utils/_deprecation.py:131: FutureWarning: 'cached_download' (from 'huggingface_hub.file_download') is deprecated and will be removed from version '0.26'. Use `hf_hub_download` instead.
-  warnings.warn(warning_message, FutureWarning)
-/gpfs/home2/scur2861/GEIA/.env/lib/python3.9/site-packages/transformers/optimization.py:591: FutureWarning: This implementation of AdamW is deprecated and will be removed in a future version. Use the PyTorch implementation torch.optim.AdamW instead, or set `no_deprecation_warning=True` to disable this warning
-  warnings.warn(
-Traceback (most recent call last):
-  File "/gpfs/home2/scur2861/GEIA/baseline/projection.py", line 545, in <module>
-    get_embedding(dataloader, config, eval=True)
-  File "/gpfs/home2/scur2861/GEIA/baseline/projection.py", line 201, in get_embedding
-    eval_sent(dataloader, model_name, embed_model_dim, config)
-  File "/gpfs/home2/scur2861/GEIA/baseline/projection.py", line 329, in eval_sent
-    baseline_model.load_state_dict(torch.load(model_path))
-  File "/gpfs/home2/scur2861/GEIA/.env/lib/python3.9/site-packages/torch/serialization.py", line 594, in load
-    with _open_file_like(f, 'rb') as opened_file:
-  File "/gpfs/home2/scur2861/GEIA/.env/lib/python3.9/site-packages/torch/serialization.py", line 230, in _open_file_like
-    return _open_file(name_or_buffer, mode)
-  File "/gpfs/home2/scur2861/GEIA/.env/lib/python3.9/site-packages/torch/serialization.py", line 211, in __init__
-    super(_open_file, self).__init__(open(name, mode))
-FileNotFoundError: [Errno 2] No such file or directory: 'blmodels/NN_qnli_sent_roberta'

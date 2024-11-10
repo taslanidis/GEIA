@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=00:50:00
-#SBATCH --output=output/%x-%j.out
+#SBATCH --output=./output/%x-%j.out
 
 # entire script fails if a single command fails
 set -e

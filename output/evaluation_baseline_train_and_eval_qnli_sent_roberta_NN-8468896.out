@@ -1,0 +1,36 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+CUDA available: True
+CUDA device count: 1
+CUDA device name: NVIDIA A100-SXM4-40GB
+  File "/gpfs/home2/scur2861/GEIA/baseline/projection.py", line 230
+    batch_label = torch.tensor(batch_label)
+TabError: inconsistent use of tabs and spaces in indentation
+
+JOB STATISTICS
+==============
+Job ID: 8468896
+Cluster: snellius
+User/Group: scur2861/scur2861
+State: RUNNING
+Nodes: 1
+Cores per node: 18
+CPU Utilized: 00:00:00
+CPU Efficiency: 0.00% of 00:04:30 core-walltime
+Job Wall-clock time: 00:00:15
+Memory Utilized: 0.00 MB (estimated maximum)
+Memory Efficiency: 0.00% of 120.00 GB (120.00 GB/node)
+WARNING: Efficiency statistics may be misleading for RUNNING jobs.

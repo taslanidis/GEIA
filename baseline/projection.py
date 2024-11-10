@@ -127,13 +127,13 @@ class collated_dataset(Dataset):
 def process_sent_list(sent_list, config):
     tokenizer = config['tokenizer']
     turn_ending = config['eos_token']
-    print(tokenizer)
+    # print(tokenizer)
     # dial_tokens = [tokenizer.encode(item) + turn_ending for item in conv]
     dial_tokens = [tokenizer.encode(item,max_length=150,padding='max_length', truncation=True) for item in sent_list]
     # for input loss training
     token_num = len(tokenizer)
-    print('lenth of tokenizer ', end='')
-    print(token_num)
+    # print('lenth of tokenizer ', end='')
+    # print(token_num)
     dial_tokens_np = np.array(dial_tokens)
     input_labels = []
     for i in dial_tokens_np:
@@ -227,17 +227,20 @@ def train_sent(dataloader, model_name, embed_model_dim, config):
         for idx, batch in enumerate(dataloader):
             # print(batch)
             batch_text, batch_label = batch
+            # print(batch_label)
+            batch_label = torch.tensor(batch_label)
             batch_label = batch_label.to(device)
             batch_text = list(batch_text)
-            print(f'{i}: Batch id: {idx}.   batch_text: {batch_text[0]}.     batch_label: {batch_label.size()}.')
+            # print(f'{i}: Batch id: {idx}.   batch_text: {batch_text[0]}.     batch_label: {batch_label.size()}.')
+            print(f'{i}: Batch id: {idx}.', end=' ')
             ### no grad for embedding model
             with torch.no_grad():
                 embeddings = model.encode(batch_text, convert_to_tensor=True)
-            print(f'embeddings:{embeddings.size()}')
+            # print(f'embeddings:{embeddings.size()}')
             # embeddings:torch.Size([64, 768, 1])
-            print(f'batch_label:{batch_label.size()}')
+            # print(f'batch_label:{batch_label.size()}')
             # batch_label:torch.Size([64, 50257, 1])
-            print(save_path)
+            # print(save_path)
             # exit()
 
             # here is the embedding sentences, we need to turn it into tensor for future use
@@ -340,13 +343,15 @@ def eval_sent(dataloader, model_name, embed_model_dim, config):
     for idx, batch in enumerate(dataloader):
         # print(batch)
         batch_text, batch_label = batch
+        batch_label = torch.tensor(batch_label)
         batch_label = batch_label.to(device)
         batch_text = list(batch_text)
-        print(f'Batch id: {idx}.   batch_text: {batch_text[0]}.     batch_label: {batch_label.size()}.')
+        # print(f'Batch id: {idx}.   batch_text: {batch_text[0]}.     batch_label: {batch_label.size()}.')
+        print(f'Batch id: {idx}.',end=" ")
         ### no grad for embedding model
         with torch.no_grad():
             embeddings = model.encode(batch_text, convert_to_tensor=True)
-            print(f'embeddings:{embeddings.size()}')
+            # print(f'embeddings:{embeddings.size()}')
             # embeddings:torch.Size([64, 1024])    [batch size, feature(dim)]
             if type == 'NN':
                 predict_result = eval_on_batch(baseline_model, criterion, embeddings, batch_label)
@@ -412,8 +417,8 @@ def eval_simcse(dataloader, model_name, embed_model_dim, config):
 def eval_on_batch(baseline_model, criterion, embedding_batch, label_batch):
     logits = baseline_model(embedding_batch, eval=True)
     loss = criterion(logits, label_batch)
-    print(logits)
-    print(type(logits))
+    # print(logits)
+    # print(type(logits))
     logits[logits >= 0.5] = 1
     logits[logits < 0.5] = 0
     print(f'========eval loss:{loss}')
@@ -438,12 +443,14 @@ def eval_label(pred_labels,ground_truth,input, config,type = 'NN'):
         save_path = 'qnli/' + type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
         #save_path = 'logs_test/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
         for idx,label_list in enumerate(pred_labels):
+            print("pred_labels idx:",idx)
             for i,value in enumerate(label_list):
                 if(value > 0):
                     assert value == 1
                     pred[idx].append(tokenizer.decode(i))  # append a string to a list
 
         for idx,label_list in enumerate(ground_truth):
+            print("ground_truth idx:",idx)
             for i,value in enumerate(label_list):
                 if(value > 0):
                     assert value == 1
@@ -540,6 +547,7 @@ if __name__ == '__main__':
                             collate_fn=dataset.collate,
                             drop_last=True)
     # for training
-    # get_embedding(dataloader, config, eval=False)
+    if config["data_type"] == "train":
+        get_embedding(dataloader, config, eval=False)
     # for evaluation
     get_embedding(dataloader, config, eval=True)

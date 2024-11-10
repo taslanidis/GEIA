@@ -16,7 +16,7 @@ do
         for MODEL_TYPE in "${MODEL_TYPE_LIST[@]}"
         do
             echo "Processing dataset: $DATASET with embed model: $EMBED_MODEL and model type: $MODEL_TYPE   "
-            sbatch --job-name "evaluation_baseline_${DATASET}_${EMBED_MODEL}_${MODEL_TYPE}" ${HOME}/GEIA/scripts/jobs/baseline_train_eval.job --model_dir baseline_weights/DialoGPT-medium --dataset ${DATASET} --data_type test --embed_model ${EMBED_MODEL} --model_type ${MODEL_TYPE}
+            sbatch --job-name "evaluation_baseline_eval_${DATASET}_${EMBED_MODEL}_${MODEL_TYPE}" ./scripts/jobs/baseline_train_eval.job --model_dir baseline_weights/DialoGPT-medium --dataset ${DATASET} --data_type train --embed_model ${EMBED_MODEL} --model_type ${MODEL_TYPE}
         done
     done
 done
