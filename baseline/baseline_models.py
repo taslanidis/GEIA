@@ -55,9 +55,9 @@ class baseline_RNN(nn.Module):
         Extract representations from GPT-2's tokens as RNN's input
 
         '''
-        self.gpt2_tokenizer = AutoTokenizer.from_pretrained('microsoft/DialoGPT-medium')
+        self.gpt2_tokenizer = AutoTokenizer.from_pretrained('baseline_weights/DialoGPT-medium')
         # self.gpt2 = AutoModelForCausalLM.from_pretrained('microsoft/DialoGPT-medium')  ### seems huggingface has bug for feature extraction with this one, return 50257 as embedding (wrong)
-        self.gpt2 = AutoModel.from_pretrained("microsoft/DialoGPT-medium")
+        self.gpt2 = AutoModel.from_pretrained("baseline_weights/DialoGPT-medium")
         # If you find errors related to padding token, uncomment these 2 lines
         ####self.gpt2_tokenizer.add_special_tokens({'pad_token': self.gpt2_tokenizer.eos_token})
         ####self.gpt2.resize_token_embeddings(len(self.gpt2_tokenizer))
