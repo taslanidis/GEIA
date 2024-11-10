@@ -82,7 +82,7 @@ def get_sst2_data(data_type):
 def get_wmt16_data(data_type):
     if(data_type == 'dev'):
         data_type = 'validation'
-    dataset = load_dataset('wmt16', 'cs-en', cache_dir="data/", split=data_type)
+    dataset = load_dataset('data/wmt16', 'cs-en', split=data_type)
     sentence_list = []
     for i, d in enumerate(dataset):
 
@@ -95,7 +95,7 @@ def get_wmt16_data(data_type):
 def get_multi_woz_data(data_type):
     if(data_type == 'dev'):
         data_type = 'validation'
-    dataset = load_dataset('multi_woz_v22', 'v2.2', cache_dir="data/", split=data_type)
+    dataset = load_dataset('multi_woz_v22', 'v2.2', cache_dir="data/", split=data_type, trust_remote_code=True)
     sentence_list = []
     for i, d in enumerate(dataset):
         s = d['turns']['utterance']

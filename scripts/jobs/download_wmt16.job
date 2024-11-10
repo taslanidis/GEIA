@@ -1,0 +1,26 @@
+#!/bin/bash 
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --gpus-per-node=1
+#SBATCH --job-name=Downloadwmt16
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=00:55:00
+#SBATCH --output=download_wmt16-%A.out
+
+
+set -e
+
+module purge
+# module load 2023
+# module load p7zip/17.04-GCCcore-12.3.0
+
+PROJECT_DIR="$PWD"
+
+#save the weights in the scratch-shared folder
+cd data/
+
+
+git lfs install
+
+git clone https://huggingface.co/datasets/wmt/wmt16

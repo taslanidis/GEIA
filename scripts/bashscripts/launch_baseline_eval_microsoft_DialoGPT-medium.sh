@@ -5,8 +5,8 @@ EMBED_MODEL_LIST=('mpnet' 'sent_roberta' 'simcse_bert' 'simcse_roberta' 'sent_t5
 MODEL_TYPE_LIST=('RNN' 'NN')
 
 #Default values
-# DATASET_LIST=('personachat')
-# EMBED_MODEL_LIST=('sent_t5')
+# DATASET_LIST=('wmt16')
+# EMBED_MODEL_LIST=('simcse_bert')
 # MODEL_TYPE_LIST=('NN')
 
 for DATASET in "${DATASET_LIST[@]}"
