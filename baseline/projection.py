@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import argparse
 import sys
-import tqdm
+from tqdm import tqdm
 
 # Get the directory containing projection.py
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -223,9 +223,9 @@ def train_sent(dataloader, model_name, embed_model_dim, config):
     print(f'save_path:{save_path}')
 
     hx = torch.zeros(64, 512).cuda()
-    for i in tqdm(range(num_epochs), desc="Epochs"):
+    for i in tqdm(range(num_epochs), desc="Epochs", total=num_epochs):
 
-        for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
+        for idx, batch in tqdm(enumerate(dataloader), desc="Batches", total=len(dataloader)):
             # print(batch)
             batch_text, batch_label = batch
             # print(batch_label)
@@ -270,8 +270,8 @@ def train_simcse(dataloader, model_name, embed_model_dim, config):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModel.from_pretrained(model_name).to(device)
     hx = torch.zeros(64, 512).cuda()
-    for i in tqdm(range(num_epochs), desc="Epochs"):
-        for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
+    for i in tqdm(range(num_epochs), desc="Epochs", total=num_epochs):
+        for idx, batch in tqdm(enumerate(dataloader), desc="Batches", total=len(dataloader)):
             batch_text, batch_label = batch
             batch_label = torch.tensor(batch_label)
             batch_label = batch_label.to(device)
@@ -341,7 +341,7 @@ def eval_sent(dataloader, model_name, embed_model_dim, config):
     predict = []
     ground_truth = []
     input_text = []
-    for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
+    for idx, batch in tqdm(enumerate(dataloader), desc="Batches", total=len(dataloader)):
         # print(batch)
         batch_text, batch_label = batch
         batch_label = torch.tensor(batch_label)
@@ -388,7 +388,7 @@ def eval_simcse(dataloader, model_name, embed_model_dim, config):
     predict = []
     ground_truth = []
     input_text = []
-    for idx, batch in tqdm(enumerate(dataloader), desc="Batches"):
+    for idx, batch in tqdm(enumerate(dataloader), desc="Batches", total=len(dataloader)):
         batch_text, batch_label = batch
         batch_label = torch.tensor(batch_label)
         batch_label = batch_label.to(device)

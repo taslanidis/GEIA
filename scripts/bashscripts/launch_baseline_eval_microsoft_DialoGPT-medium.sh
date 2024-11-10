@@ -6,7 +6,7 @@ MODEL_TYPE_LIST=('RNN' 'NN')
 
 #Default values
 # DATASET_LIST=('personachat')
-# EMBED_MODEL_LIST=('simcse_bert')
+# EMBED_MODEL_LIST=('sent_t5')
 # MODEL_TYPE_LIST=('NN')
 
 for DATASET in "${DATASET_LIST[@]}"
