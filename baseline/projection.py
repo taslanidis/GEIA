@@ -2,6 +2,8 @@ import os
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
+USER = os.environ.get('USER') 
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -211,7 +213,8 @@ def get_embedding(dataloader, config, eval=False):
 def train_sent(dataloader, model_name, embed_model_dim, config):
     device = config['device']
     num_epochs = config['num_epochs']
-    model = SentenceTransformer(model_name, device=device)
+    os.makedirs(f'/scratch-shared/{USER}/sentence_transformers', exist_ok=True)
+    model = SentenceTransformer(model_name, device=device, cache_folder=f'/scratch-shared/{USER}/sentence_transformers')
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
     save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
@@ -323,7 +326,8 @@ def report_score(y_true, y_pred):
 def eval_sent(dataloader, model_name, embed_model_dim, config):
     device = config['device']
     num_epochs = config['num_epochs']
-    model = SentenceTransformer(model_name, device=device)
+    os.makedirs(f'/scratch-shared/{USER}/sentence_transformers', exist_ok=True) 
+    model = SentenceTransformer(model_name, device=device, cache_folder=f'/scratch-shared/{USER}/sentence_transformers')
     type = config['model_type']
     hx = torch.zeros(64, 512).cuda()
 
@@ -440,8 +444,10 @@ def eval_label(pred_labels,ground_truth,input, config,type = 'NN'):
         gt = [[] for i in range(len(pred_labels))]
         ####log_text = model_path+'_threshold_'+str(threshold)
         str_threshold = f'{threshold:.2f}'
-        save_path = 'qnli/' + type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
-        #save_path = 'logs_test/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
+        # save_path = 'qnli/' + type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
+        save_path = 'logs_test/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
         for idx,label_list in enumerate(pred_labels):
             print("pred_labels idx:",idx)
             for i,value in enumerate(label_list):
@@ -470,6 +476,7 @@ def eval_label(pred_labels,ground_truth,input, config,type = 'NN'):
         pred = [[] for i in range(len(pred_labels))]
         gt = [[] for i in range(len(pred_labels))]
         save_path = 'logs_test/' +'test_' + type + '_' + config['dataset'] + '_' + config['embed_model'] + '.label'
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         # save_path = 'logs_test/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label
 
         for idx, label_list in enumerate(pred_labels):
