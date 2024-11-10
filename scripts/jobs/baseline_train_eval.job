@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --gpus-per-node=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=00:50:00
+#SBATCH --output=$HOME/GEIA/output/%/%x-%j.out
+
+# entire script fails if a single command fails
+set -e
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+
+PROJECT_DIR="$PWD"
+ENV_PREFIX="$PROJECT_DIR"/.env
+
+source activate $ENV_PREFIX
+
+CUDA_VISIBLE_DEVICES=0 python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('CUDA device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No CUDA device')"
+
+CUDA_VISIBLE_DEVICES=0 python baseline/projection.py "$@"
