@@ -1,5 +1,6 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import torch
 import torch.nn as nn
@@ -23,7 +24,10 @@ from attacker_evaluation_gpt import eval_on_batch
 from datasets import load_dataset
 from data_process import get_sent_list
 
+
+
 class linear_projection(nn.Module):
+    
     def __init__(self, in_num, out_num=1024):
         super(linear_projection, self).__init__()
         self.fc1 = nn.Linear(in_num, out_num)
@@ -33,15 +37,13 @@ class linear_projection(nn.Module):
         out_shape = x.size()[-1]
         assert(x.size()[1] == out_shape)
         out = self.fc1(x)
-
-
         return out
 
 
 class personachat(Dataset):
+    
     def __init__(self, data):
         self.data = data
-
 
     def __len__(self):
         return len(self.data)
@@ -55,20 +57,36 @@ class personachat(Dataset):
     def collate(self, unpacked_data):
         return unpacked_data
 
-def process_data(data,batch_size,device,config,need_porj=True):
-    #model = SentenceTransformer('all-roberta-large-v1',device=device)   # dim 1024
-    device_1 = torch.device("cuda:0")
-    model = SentenceTransformer(config['embed_model_path'],device=device_1)   # dim 768
+
+def process_data(
+        data, 
+        batch_size: int, 
+        device: torch.device, 
+        config: dict, 
+        attacker_emb_size: int
+    ):
+    # model = SentenceTransformer('all-roberta-large-v1', device=device)   # dim 1024
+    # device_1 = torch.device("cuda:0")
+    model = SentenceTransformer(config['embed_model_path'], device=device)   # dim 768
     dataset = personachat(data)
     dataloader = DataLoader(dataset=dataset, 
                               shuffle=True, 
                               batch_size=batch_size, 
                               collate_fn=dataset.collate)
 
-    print('load data done')
+    print('Load data done')
+
+    embedding_dimension: int = 768
+    if config['embed_model_path'] == 'all-roberta-large-v1':
+        embedding_dimension = 1024
+
+    # projection needed if sizes are different
+    need_proj: bool = attacker_emb_size != embedding_dimension
+
     ### extra projection
-    if need_porj:
-        projection = linear_projection(in_num=768, out_num=1280).to(device)
+    if need_proj:
+        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size).to(device)
+    
     ### for attackers
     model_attacker = AutoModelForCausalLM.from_pretrained(config['model_dir'])
     tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
@@ -88,7 +106,7 @@ def process_data(data,batch_size,device,config,need_porj=True):
     optimizer = AdamW(optimizer_grouped_parameters, 
                   lr=3e-5,
                   eps=1e-06)
-    if need_porj:
+    if need_proj:
         optimizer.add_param_group({'params': projection.parameters()})
     scheduler = get_linear_schedule_with_warmup(optimizer, 
                                             num_warmup_steps=100, 
@@ -97,23 +115,32 @@ def process_data(data,batch_size,device,config,need_porj=True):
     ### process to obtain the embeddings
     for i in range(num_epochs):
         model.eval()
-        for idx,batch_text in enumerate(dataloader):
+        for idx, batch_text in enumerate(dataloader):
+            
             with torch.no_grad():           
-                embeddings = model.encode(batch_text,convert_to_tensor = True).to(device)
-                print(f'Embedding dim: {embeddings.size()}')
+                embeddings = model.encode(batch_text, convert_to_tensor=True).to(device)
+                # print(f'Embedding dim: {embeddings.size()}')
 
-            ### attacker part, needs training
-            if need_porj:
+            # attacker part, needs training
+            if need_proj:
                embeddings = projection(embeddings)
 
-            record_loss, perplexity = train_on_batch(batch_X=embeddings,batch_D=batch_text,model=model_attacker,tokenizer=tokenizer_attacker,criterion=criterion,device=device,train=True)
+            record_loss, perplexity = train_on_batch(
+                batch_X=embeddings,
+                batch_D=batch_text,
+                model=model_attacker,
+                tokenizer=tokenizer_attacker,
+                criterion=criterion,
+                device=device,
+                train=True
+            )
             optimizer.step()
             scheduler.step()
             # make sure no grad for GPT optimizer
             optimizer.zero_grad()
             print(f'Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}')
             #sys.exit(-1)
-        if need_porj:
+        if need_proj:
             proj_path = 'models/' + 'projection_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
             torch.save(projection.state_dict(), proj_path)
         save_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
@@ -121,11 +148,17 @@ def process_data(data,batch_size,device,config,need_porj=True):
 
 
 ### used for testing only
-def process_data_test(data,batch_size,device,config,need_proj=True):
+def process_data_test(
+        data,
+        batch_size: int,
+        device: torch.device,
+        config: dict,
+        attacker_emb_size: int
+    ):
     #model = SentenceTransformer('all-roberta-large-v1',device=device)   # dim 1024
     #model = SentenceTransformer(config['embed_model_path'],device=device)   #  dim 768
-    device_1 = torch.device("cuda:0")
-    model = SentenceTransformer(config['embed_model_path'],device=device_1)   # dim 768
+    # device_1 = torch.device("cuda:0")
+    model = SentenceTransformer(config['embed_model_path'], device=device)   # dim 768
     if(config['decode'] == 'beam'):
         save_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']+'_beam'+'.log'
     else:
@@ -138,9 +171,17 @@ def process_data_test(data,batch_size,device,config,need_proj=True):
                               collate_fn=dataset.collate)
 
     print('load data done')
+
+    embedding_dimension: int = 768
+    if config['embed_model_path'] == 'all-roberta-large-v1':
+        embedding_dimension = 1024
+
+    # projection needed if sizes are different
+    need_proj: bool = attacker_emb_size != embedding_dimension
+
     if need_proj:
         proj_path = 'models/' + 'projection_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
-        projection = linear_projection(in_num=768, out_num=1280)
+        projection = linear_projection(in_num=embedding_dimension, out_num=1280)
         projection.load_state_dict(torch.load(proj_path))
         projection.to(device)
         print('load projection done')
@@ -259,10 +300,8 @@ def train_on_batch(batch_X,batch_D,model,tokenizer,criterion,device,train=True):
 
 
 
-
-
 if __name__ == '__main__':
-    model_cards ={}
+    model_cards = {}
     model_cards['sent_t5_large'] = 'sentence-t5-large'
     model_cards['sent_t5_base'] = 'sentence-t5-base'
     model_cards['sent_t5_xl'] = 'sentence-t5-xl'
@@ -292,24 +331,37 @@ if __name__ == '__main__':
     config['embed_model'] = args.embed_model
     config['decode'] = args.decode
     config['embed_model_path'] = model_cards[config['embed_model']]
-    config['device'] = torch.device("cuda")
+
+    if torch.cuda.is_available():
+        config['device'] = torch.device("cuda")
+    else:
+        raise ImportError("Torch couldn't find CUDA devices. Can't run the attacker on CPU.")
+    
     config['tokenizer'] = AutoTokenizer.from_pretrained('microsoft/DialoGPT-large')
     config['eos_token'] = config['tokenizer'].eos_token
     config['use_opt'] = False
 
-    
-    device = torch.device("cuda:0")
-    #device = torch.device("cpu")
+    device = config['device']
     batch_size = config['batch_size']
 
     sent_list = get_sent_list(config)
     
+    # TODO: figure out when projection is necessary
+    attacker_emb_size = 768
+    if config['model_dir'].find("medium") != -1:
+        attacker_emb_size = 1024
+    elif config['model_dir'].find("large") != -1:
+        attacker_emb_size = 1280
+
     ##### for training
     if(config['data_type'] == 'train'):
-        process_data(sent_list,batch_size,device,config)
+
+        process_data(sent_list,batch_size,device,config,attacker_emb_size)
+
     elif(config['data_type'] == 'test'):
+       
         if('simcse' in config['embed_model']):
             process_data_test_simcse(sent_list,batch_size,device,config,proj_dir=None,need_proj=False)
         else:
-            process_data_test(sent_list,batch_size,device,config,need_proj=True)
+            process_data_test(sent_list,batch_size,device,config,attacker_emb_size=attacker_emb_size)
 
