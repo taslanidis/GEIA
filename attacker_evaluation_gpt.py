@@ -1,5 +1,6 @@
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 import time
 import numpy as np
 import pandas as pd
@@ -20,6 +21,8 @@ import json
 from decode_beam_search import beam_decode_sentence
 import decode_beam_search_opt
 #from bookcorpus_train import str2bool,BookCorpus_Dataset
+
+
 def get_dataloader(config):
     data_type= config['data_type']
     batch_size = config['batch_size']
@@ -139,15 +142,22 @@ def eval(dataloader,config):
     tokenizer = config['tokenizer']
     device = config['device']
     model.to(device)
-    criterion = SequenceCrossEntropyLoss()
     save_path = config['save_path']
     sent_dict = {}
     sent_dict['gt'] = []
     sent_dict['pred'] = []
+
     with torch.no_grad():
         for idx,(batch_X,batch_D) in enumerate(dataloader):
             batch_D = list(batch_D)
-            sent_list, gt_list = eval_on_batch(batch_X,batch_D,model,tokenizer,device,config)    
+            sent_list, gt_list = eval_on_batch(
+                batch_X,
+                batch_D,
+                model,
+                tokenizer,
+                device,
+                config
+            )    
             sent_dict['pred'].extend(sent_list)
             sent_dict['gt'].extend(gt_list)
 
@@ -155,31 +165,48 @@ def eval(dataloader,config):
             json.dump(sent_dict, f,indent=4)
 
 
-def eval_on_batch(batch_X,batch_D,model,tokenizer,device,config):
-    decode_method = config['decode']
+def eval_on_batch(
+        batch_X,
+        batch_D,
+        model,
+        tokenizer,
+        device: torch.device,
+        config: dict
+    ):
+    decode_method: str = config['decode']
     padding_token_id = tokenizer.encode(tokenizer.eos_token)[0]
     if(not config['use_opt']):
         tokenizer.pad_token = tokenizer.eos_token
     batch_X = batch_X.to(device)
-    print(f'batch_X:{batch_X.size()}')
+    print(f'Batch_X: {batch_X.size()}')
     sent_list = []
     gt_list = batch_D
-    for i,hidden in enumerate(batch_X):
-        inputs_embeds = hidden
-        if(decode_method == 'beam'):
-            #print('Using beam search decoding')
-            if(config['use_opt']):
-                sentence = decode_beam_search_opt.beam_decode_sentence(hidden_X=inputs_embeds, config = config,num_generate=1, beam_size = 5)
-            else:
-                sentence = beam_decode_sentence(hidden_X=inputs_embeds, config = config,num_generate=1, beam_size = 5)
 
-            #print(sentence)
+    for i, hidden in enumerate(batch_X):
+        inputs_embeds = hidden
+        
+        if(decode_method == 'beam'):
+
+            if(config['use_opt']):
+                sentence = decode_beam_search_opt.beam_decode_sentence(
+                    hidden_X=inputs_embeds, 
+                    config=config,
+                    num_generate=1, 
+                    beam_size=5
+                )
+            else:
+                sentence = beam_decode_sentence(
+                    hidden_X=inputs_embeds, 
+                    config=config, 
+                    num_generate=1, 
+                    beam_size=5
+                )
+
             sentence = sentence[0]
         else:
-            sentence = generate_sentence(config,hidden_X=inputs_embeds)
+            sentence = generate_sentence(config, hidden_X=inputs_embeds)
+        
         sent_list.append(sentence)
-
-
 
     return sent_list, gt_list
 
@@ -191,7 +218,7 @@ def main():
     parser.add_argument('--data_type', type=str, default='test', help='Type of the processed data.')
     parser.add_argument('--save_path', type=str, default='logs/attacker_gpt2_p_sbert.log', help='Type of the processed data.')
     parser.add_argument('--num_epochs', type=int, default=1, help='Type of the processed data.')
-    parser.add_argument('--p_simcse_flag', type=str2bool, default=True, help='Type of the processed data.')
+    parser.add_argument('--p_simcse_flag', type=bool, default=True, help='Type of the processed data.')
 
     args = parser.parse_args()
     tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
@@ -213,6 +240,8 @@ def main():
     print('get_model done')
     dataloader = get_dataloader(config)
     print('get_dataloader done')
-    eval(dataloader,config)
+    eval(dataloader, config)
+
+
 if __name__ == '__main__':
     main()

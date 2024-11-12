@@ -79,6 +79,10 @@ def process_data(
     embedding_dimension: int = 768
     if config['embed_model_path'] == 'all-roberta-large-v1':
         embedding_dimension = 1024
+    elif config['embed_model_path'] == 'sent_t5_base':
+        embedding_dimension = 1024
+    elif config['embed_model_path'].find('simcse') != -1:
+        embedding_dimension = 1024
 
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
@@ -198,24 +202,38 @@ def process_data_test(
     with torch.no_grad():  
         for idx,batch_text in enumerate(dataloader):
 
-            embeddings = model.encode(batch_text,convert_to_tensor = True).to(device)
+            embeddings = model.encode(batch_text, convert_to_tensor=True).to(device)
   
             if need_proj:
                 embeddings = projection(embeddings)
 
-            sent_list, gt_list = eval_on_batch(batch_X=embeddings,batch_D=batch_text,model=config['model'],tokenizer=config['tokenizer'],device=device,config=config)    
-            print(f'testing {idx} batch done with {idx*batch_size} samples')
+            sent_list, gt_list = eval_on_batch(
+                batch_X=embeddings,
+                batch_D=batch_text,
+                model=config['model'],
+                tokenizer=config['tokenizer'],
+                device=device,
+                config=config
+            )    
+            print(f'Testing {idx} batch done with {idx*batch_size} samples')
             sent_dict['pred'].extend(sent_list)
             sent_dict['gt'].extend(gt_list)
         
         with open(save_path, 'w') as f:
-            json.dump(sent_dict, f,indent=4)
+            json.dump(sent_dict, f, indent=4)
 
     return 0
         
 
 ### used for testing only
-def process_data_test_simcse(data,batch_size,device,config,proj_dir=None,need_proj=False):
+def process_data_test_simcse(
+        data,
+        batch_size: int,
+        device: torch.device,
+        config: dict,
+        proj_dir=None,
+        need_proj=False
+    ):
     tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])  # dim 1024
     model = AutoModel.from_pretrained(config['embed_model_path']).to(device)
     #save_path = 'logs/attacker_gpt2_qnli_simcse_bert_large.log'
@@ -232,6 +250,7 @@ def process_data_test_simcse(data,batch_size,device,config,proj_dir=None,need_pr
                               collate_fn=dataset.collate)
 
     print('load data done')
+    
     if need_proj:
         projection = linear_projection(in_num=768)
         projection.load_state_dict(torch.load(proj_dir))
@@ -239,7 +258,8 @@ def process_data_test_simcse(data,batch_size,device,config,proj_dir=None,need_pr
         print('load projection done')
     else:
         print('no projection loaded')
-    # setup on config for sentence generation   AutoModelForCausalLM
+    
+    # setup on config for sentence generation AutoModelForCausalLM
     attacker_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
     config['model'] = AutoModelForCausalLM.from_pretrained(attacker_path).to(device)
     config['tokenizer'] = AutoTokenizer.from_pretrained('microsoft/DialoGPT-large')
@@ -251,13 +271,22 @@ def process_data_test_simcse(data,batch_size,device,config,proj_dir=None,need_pr
         for idx,batch_text in enumerate(dataloader):
             inputs = tokenizer(batch_text, padding=True, truncation=True, return_tensors="pt").to(device)
             embeddings = model(**inputs, output_hidden_states=True, return_dict=True).pooler_output  
+            
             if need_proj:
                 embeddings = projection(embeddings)
-            #sent_list, gt_list = eval_on_batch(batch_X=embeddings,batch_D=batch_text,model=config['model'],tokenizer=config['tokenizer'],device=device,config=config)    
-            sent_list, gt_list = eval_on_batch(batch_X=embeddings,batch_D=batch_text,model=config['model'],tokenizer=config['tokenizer'],device=device,config=config) 
-            print(f'testing {idx} batch done with {idx*batch_size} samples')
+
+            sent_list, gt_list = eval_on_batch(
+                batch_X=embeddings,
+                batch_D=batch_text,
+                model=config['model'],
+                tokenizer=config['tokenizer'],
+                device=device,
+                config=config
+            ) 
+            print(f'Testing {idx} batch done with {idx*batch_size} samples')
             sent_dict['pred'].extend(sent_list)
             sent_dict['gt'].extend(gt_list)
+        
         with open(save_path, 'w') as f:
             json.dump(sent_dict, f,indent=4)
 

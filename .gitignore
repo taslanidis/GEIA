@@ -14,6 +14,8 @@ model_weights
 data_real
 baseline_weights
 blmodels
+models/
+output/
 
 # Distribution / packaging
 .Python
