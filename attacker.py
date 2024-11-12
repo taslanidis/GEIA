@@ -14,7 +14,7 @@ import argparse
 import sys
 
 from transformers import AutoModel, AutoTokenizer
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM,GPT2Config,GPT2LMHeadModel
 from transformers import AdamW,get_linear_schedule_with_warmup
 from torch.utils.data import DataLoader, Dataset
 from attacker_models import SequenceCrossEntropyLoss
@@ -38,6 +38,13 @@ class linear_projection(nn.Module):
         assert(x.size()[1] == out_shape)
         out = self.fc1(x)
         return out
+
+
+def init_gpt2():
+    config = GPT2Config.from_pretrained('microsoft/DialoGPT-medium')
+    tokenizer = AutoTokenizer.from_pretrained('microsoft/DialoGPT-large')
+    model = GPT2LMHeadModel(config)
+    return model, tokenizer
 
 
 class personachat(Dataset):
@@ -92,8 +99,12 @@ def process_data(
         projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size).to(device)
     
     ### for attackers
-    model_attacker = AutoModelForCausalLM.from_pretrained(config['model_dir'])
-    tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
+    if config['model_dir'] == 'random_gpt2_medium':
+        model_attacker, tokenizer_attacker = init_gpt2()
+    else:
+        model_attacker = AutoModelForCausalLM.from_pretrained(config['model_dir'])
+        tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
+    
     criterion = SequenceCrossEntropyLoss()
     model_attacker.to(device)
     param_optimizer = list(model_attacker.named_parameters())
@@ -143,12 +154,10 @@ def process_data(
             # make sure no grad for GPT optimizer
             optimizer.zero_grad()
             print(f'Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}')
-            #sys.exit(-1)
+
         if need_proj:
-            proj_path = 'models/' + 'projection_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
-            torch.save(projection.state_dict(), proj_path)
-        save_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
-        model_attacker.save_pretrained(save_path)
+            torch.save(projection.state_dict(), config['projection_save_path'])
+        model_attacker.save_pretrained(config['attacker_save_path'])
 
 
 ### used for testing only
@@ -159,14 +168,13 @@ def process_data_test(
         config: dict,
         attacker_emb_size: int
     ):
-    #model = SentenceTransformer('all-roberta-large-v1',device=device)   # dim 1024
-    #model = SentenceTransformer(config['embed_model_path'],device=device)   #  dim 768
-    # device_1 = torch.device("cuda:0")
-    model = SentenceTransformer(config['embed_model_path'], device=device)   # dim 768
+    model = SentenceTransformer(config['embed_model_path'], device=device)
+    
     if(config['decode'] == 'beam'):
-        save_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']+'_beam'+'.log'
+        save_path = "logs/" + config['attacker_save_name'] + '_beam.log'
     else:
-        save_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']+'.log'
+        save_path = "logs/" + config['attacker_save_name'] + '.log'
+    
     dataset = personachat(data)
     # no shuffle for testing data
     dataloader = DataLoader(dataset=dataset, 
@@ -179,21 +187,24 @@ def process_data_test(
     embedding_dimension: int = 768
     if config['embed_model_path'] == 'all-roberta-large-v1':
         embedding_dimension = 1024
+    elif config['embed_model_path'] == 'sent_t5_base':
+        embedding_dimension = 1024
+    elif config['embed_model_path'].find('simcse') != -1:
+        embedding_dimension = 1024
 
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
 
     if need_proj:
-        proj_path = 'models/' + 'projection_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
         projection = linear_projection(in_num=embedding_dimension, out_num=1280)
-        projection.load_state_dict(torch.load(proj_path))
+        projection.load_state_dict(torch.load(config['projection_save_path']))
         projection.to(device)
         print('load projection done')
     else:
         print('no projection loaded')
+    
     # setup on config for sentence generation   AutoModelForCausalLM
-    attacker_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
-    config['model'] = AutoModelForCausalLM.from_pretrained(attacker_path).to(device)
+    config['model'] = AutoModelForCausalLM.from_pretrained(config['attacker_save_path']).to(device)
     config['tokenizer'] = AutoTokenizer.from_pretrained('microsoft/DialoGPT-large')
 
     sent_dict = {}
@@ -236,12 +247,13 @@ def process_data_test_simcse(
     ):
     tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])  # dim 1024
     model = AutoModel.from_pretrained(config['embed_model_path']).to(device)
-    #save_path = 'logs/attacker_gpt2_qnli_simcse_bert_large.log'
+
     if(config['decode'] == 'beam'):
         print('Using beam search decoding')
-        save_path = 'logs/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']+'_beam'+'.log'
+        save_path = 'logs/' + config['attacker_save_name'] + '_beam.log'
     else:
-        save_path = 'logs/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']+'.log'
+        save_path = 'logs/' + config['attacker_save_name'] +'.log'
+    
     dataset = personachat(data)
     # no shuffle for testing data
     dataloader = DataLoader(dataset=dataset, 
@@ -260,8 +272,7 @@ def process_data_test_simcse(
         print('no projection loaded')
     
     # setup on config for sentence generation AutoModelForCausalLM
-    attacker_path = 'models/' + 'attacker_gpt2_large_' + config['dataset'] + '_' + config['embed_model']
-    config['model'] = AutoModelForCausalLM.from_pretrained(attacker_path).to(device)
+    config['model'] = AutoModelForCausalLM.from_pretrained(config['attacker_save_path']).to(device)
     config['tokenizer'] = AutoTokenizer.from_pretrained('microsoft/DialoGPT-large')
 
     sent_dict = {}
@@ -360,6 +371,15 @@ if __name__ == '__main__':
     config['embed_model'] = args.embed_model
     config['decode'] = args.decode
     config['embed_model_path'] = model_cards[config['embed_model']]
+
+    # custom save paths
+    attacker_model: str = "rand_gpt2_m" if args.model_dir == "random_gpt2_medium" else "dialogpt2"
+    attacker_save_name: str = f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}"
+    projection_save_name: str = f"projection_{attacker_model}_{config['dataset']}_{config['embed_model']}"
+    config['attacker_save_path'] = f"models/{attacker_save_name}"
+    config['projection_save_path'] = f"models/{projection_save_name}"
+    config['attacker_save_name'] = attacker_save_name
+    config['projection_save_name'] = projection_save_name
 
     if torch.cuda.is_available():
         config['device'] = torch.device("cuda")

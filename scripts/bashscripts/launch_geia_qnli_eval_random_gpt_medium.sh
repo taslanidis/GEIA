@@ -5,7 +5,7 @@
 
 # Default values
 DATASET_LIST=('personachat')
-EMBED_MODEL_LIST=('sent_roberta')
+EMBED_MODEL_LIST=('sent_roberta' 'simcse_bert')
 
 for DATASET in "${DATASET_LIST[@]}"
 do
