@@ -12,7 +12,6 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 from tqdm import tqdm
 from evaluate import load
-from ppl import calucate_ppl
 import editdistance
 import string
 
@@ -26,18 +25,8 @@ model.eval()
 # model_id = "gpt2-large"
 
 
-
-
 #model = GPT2LMHeadModel.from_pretrained(model_id).to(device)
 #tokenizer = GPT2TokenizerFast.from_pretrained(model_id)
-perplexity = load("perplexity", module_type="metric")
-
-#self training GPT-2 for PPL evaluation
-# ppl_model = GPT2LMHeadModel.from_pretrained("gpt_large_persona")
-# device = torch.device("cuda")
-# ppl_model = ppl_model.to(device)
-# ppl_model.eval()
-# model = model.to(device)
 
 # remove punctuation from list of sentences 
 def punctuation_remove(sent_list):
@@ -52,28 +41,10 @@ def punctuation_remove(sent_list):
         removed_list.append(removed_sent)
     return removed_list
 
-
 def read_gpt(path):
     with open(path) as f:
         data = json.load(f)
     return data
-
-def get_ppl(data,gpt_train= True):
-    gt = data['gt']
-    pred = data["pred"]
-    if(gpt_train):
-        ppl_gt,var_gt,ppl_pred,var_pred = calucate_ppl(gt,pred,ppl_model)
-        print(f"GT: Validation Perplexity: {ppl_gt} Variance: {var_gt}")
-        print(f"PRED: Validation Perplexity: {ppl_pred} Variance: {var_pred}")
-    else:
-        results_pred = perplexity.compute(model_id=model_id,
-                                add_start_token=True,
-                                predictions=pred)
-        results_gt = perplexity.compute(model_id=model_id,
-                                add_start_token=True,
-                                predictions=gt)
-        print(f'results_pred: {results_pred["mean_perplexity"]}')
-        print(f'results_gt: {results_gt["mean_perplexity"]}')
 
 
 def get_rouge(data):
@@ -116,7 +87,6 @@ def embed_similarity(data,batch_size=16):
     pred_batch = list(batch(pred, batch_size))
     cosine_scores_all = []
     for i in range(len(gt_batch)):
-
         embeddings1 = model.encode(gt_batch[i], convert_to_tensor=True)
         embeddings2 = model.encode(pred_batch[i], convert_to_tensor=True)
         cosine_scores = util.cos_sim(embeddings1, embeddings2)
@@ -186,7 +156,6 @@ def report_metrics(data):
     remove_eos(data)
     get_rouge(data)
     get_bleu(data)
-    # get_ppl(data)     ### ppl please refer to ppl.py for ppl calculation
     exact_match(data)
     get_edit_dist(data)
     embed_similarity(data)
