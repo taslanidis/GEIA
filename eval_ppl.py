@@ -136,9 +136,9 @@ def read_logs(path):
     pred  = data["pred"]
     return pred
 
-# def get_val_ppl(path,batch_size,device,config):
-#     sent_list = read_logs(path)
-#     process_data(sent_list,batch_size,device,config)
+def get_val_ppl(path,batch_size,device,config):
+    sent_list = read_logs(path)
+    process_data(sent_list,batch_size,device,config)
 
 # def get_qnli_data(data_type):
 #     dataset = load_dataset('glue','qnli', cache_dir="/home/hlibt/embed_rev/data", split=data_type)
@@ -213,7 +213,10 @@ if __name__ == '__main__':
     sentence_T5_large_pc_path = '../models_random/attacker_gpt2_qnli_sent_t5.log' 
     mpnet_pc_path = '../models_random/attacker_gpt2_qnli_mpnet.log'
     
+    first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
 
+    path_list = [first, second]
     
     print('===mpnet===')
     get_val_ppl(mpnet_pc_path,batch_size,device,config)

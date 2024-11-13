@@ -1,0 +1,20 @@
+2024-11-13 15:46:52,037 - INFO -  =====/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log=====
+2024-11-13 15:48:51,355 - INFO -  micro precision_score on token level: 0.5664042725523944
+2024-11-13 15:48:51,356 - INFO -  micro recall_score on token level: 0.4941509006895257
+2024-11-13 15:48:51,356 - INFO -  micro f1_score on token level: 0.5278163522235096
+2024-11-13 15:48:54,740 - INFO -  word level precision: 0.6541889483065954
+2024-11-13 15:48:54,740 - INFO -  word level recall: 0.569627594448773
+2024-11-13 15:48:54,740 - INFO -  word level f1: 0.608986827551566
+2024-11-13 15:48:56,588 - INFO -  word level precision without punctuation: 0.63119657785459
+2024-11-13 15:48:56,588 - INFO -  word level recall without punctuation: 0.5435014216594396
+2024-11-13 15:48:56,588 - INFO -  word level f1 without punctuation: 0.5840756305918025
+2024-11-13 15:48:56,624 - INFO -  =====/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log=====
+2024-11-13 15:50:58,049 - INFO -  micro precision_score on token level: 0.17927110857197268
+2024-11-13 15:50:58,049 - INFO -  micro recall_score on token level: 0.12472741927470064
+2024-11-13 15:50:58,049 - INFO -  micro f1_score on token level: 0.14710612502685844
+2024-11-13 15:51:00,854 - INFO -  word level precision: 0.12692985290898287
+2024-11-13 15:51:00,854 - INFO -  word level recall: 0.08543007949572645
+2024-11-13 15:51:00,854 - INFO -  word level f1: 0.10212498470502247
+2024-11-13 15:51:02,602 - INFO -  word level precision without punctuation: 0.1053306466385785
+2024-11-13 15:51:02,602 - INFO -  word level recall without punctuation: 0.07266410157230783
+2024-11-13 15:51:02,602 - INFO -  word level f1 without punctuation: 0.08599980485889888
