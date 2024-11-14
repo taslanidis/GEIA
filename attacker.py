@@ -13,9 +13,12 @@ import pandas as pd
 import argparse
 import sys
 
-from transformers import AutoModel, AutoTokenizer
-from transformers import AutoModelForCausalLM,GPT2Config,GPT2LMHeadModel
-from transformers import AdamW,get_linear_schedule_with_warmup
+from transformers import (
+    AutoModel, AutoTokenizer,
+    AutoModelForCausalLM, GPT2Config, GPT2LMHeadModel,
+    T5Tokenizer, T5ForConditionalGeneration,T5Config,
+    AdamW, get_linear_schedule_with_warmup
+)
 from torch.utils.data import DataLoader, Dataset
 from attacker_models import SequenceCrossEntropyLoss
 from sentence_transformers import SentenceTransformer
@@ -47,6 +50,13 @@ def init_gpt2():
     return model, tokenizer
 
 
+def init_opt():
+    config = T5Config.from_pretrained('google/t5-large-lm-adapt')
+    model = T5ForConditionalGeneration(config)
+    tokenizer = T5Tokenizer.from_pretrained("google/t5-large-lm-adapt")
+    return model, tokenizer
+
+
 class personachat(Dataset):
     
     def __init__(self, data):
@@ -72,8 +82,8 @@ def process_data(
         config: dict, 
         attacker_emb_size: int
     ):
-    # model = SentenceTransformer('all-roberta-large-v1', device=device)   # dim 1024
-    # device_1 = torch.device("cuda:0")
+
+    # Victim model (model f)
     model = SentenceTransformer(config['embed_model_path'], device=device)   # dim 768
     dataset = personachat(data)
     dataloader = DataLoader(dataset=dataset, 
@@ -94,11 +104,11 @@ def process_data(
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
 
-    ### extra projection
+    # Extra Projection; aligning model f (victim) with the attacker
     if need_proj:
         projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size).to(device)
     
-    ### for attackers
+    # Attacker Model
     if config['model_dir'] == 'random_gpt2_medium':
         model_attacker, tokenizer_attacker = init_gpt2()
     else:
@@ -110,9 +120,8 @@ def process_data(
     param_optimizer = list(model_attacker.named_parameters())
     no_decay = ['bias', 'ln', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
-    {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-    {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
     num_gradients_accumulation = 1
     num_epochs = config['num_epochs']
@@ -123,16 +132,21 @@ def process_data(
                   eps=1e-06)
     if need_proj:
         optimizer.add_param_group({'params': projection.parameters()})
+    
     scheduler = get_linear_schedule_with_warmup(optimizer, 
                                             num_warmup_steps=100, 
                                             num_training_steps = num_train_optimization_steps)
     
-    ### process to obtain the embeddings
+    # 1. Get the embeddings from victim on text
+    # 2. Pass through the projection (if embedding spaces don't match)
+    # 3. Train the attacker, by:
+    #     3.a Taking the sentence embedding and generating text
+    #     3.b Calculate the loss compared of the generated text, and the GT text
     for i in range(num_epochs):
         model.eval()
         for idx, batch_text in enumerate(dataloader):
             
-            with torch.no_grad():           
+            with torch.no_grad():       
                 embeddings = model.encode(batch_text, convert_to_tensor=True).to(device)
                 # print(f'Embedding dim: {embeddings.size()}')
 
@@ -154,10 +168,107 @@ def process_data(
             # make sure no grad for GPT optimizer
             optimizer.zero_grad()
             print(f'Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}')
-
+        
         if need_proj:
             torch.save(projection.state_dict(), config['projection_save_path'])
         model_attacker.save_pretrained(config['attacker_save_path'])
+
+
+def process_data_simcse(
+        data,
+        batch_size: int,
+        device: torch.device,
+        config: dict,
+        attacker_emb_size: int
+    ):
+    embed_model_name = config['embed_model']
+    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])  # dim 1024
+    model = AutoModel.from_pretrained(config['embed_model_path']).to(device)
+    dataset = personachat(data)
+    dataloader = DataLoader(dataset=dataset, 
+                              shuffle=True, 
+                              batch_size=batch_size, 
+                              collate_fn=dataset.collate)
+
+    print('load data done')
+
+    # TODO: Create a function for this to be re-usable
+    embedding_dimension: int = 768
+    if config['embed_model_path'] == 'all-roberta-large-v1':
+        embedding_dimension = 1024
+    elif config['embed_model_path'] == 'sent_t5_base':
+        embedding_dimension = 1024
+    elif config['embed_model_path'].find('simcse') != -1:
+        embedding_dimension = 1024
+
+    # projection needed if sizes are different
+    need_proj: bool = attacker_emb_size != embedding_dimension
+
+    ### extra projection
+    if need_proj:
+        projection = linear_projection(in_num=embedding_dimension).to(device)
+
+    ### for attackers
+    ### TODO: make a function to create the model/tokenizer parametrized on model_dir
+    if config['model_dir'] == 'random_gpt2_medium':
+        model_attacker, tokenizer_attacker = init_gpt2()
+    else:
+        model_attacker = AutoModelForCausalLM.from_pretrained(config['model_dir'])
+        tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
+    
+    criterion = SequenceCrossEntropyLoss()
+    model_attacker.to(device)
+    param_optimizer = list(model_attacker.named_parameters())
+    no_decay = ['bias', 'ln', 'LayerNorm.weight']
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    ]
+    num_gradients_accumulation = 1
+    num_epochs = config['num_epochs']
+    batch_size = config['batch_size']
+    num_train_optimization_steps  = len(dataloader) * num_epochs // num_gradients_accumulation
+    optimizer = AdamW(optimizer_grouped_parameters, 
+                  lr=3e-5,
+                  eps=1e-06)
+    if need_proj:
+        optimizer.add_param_group({'params': projection.parameters()})
+    scheduler = get_linear_schedule_with_warmup(optimizer, 
+                                            num_warmup_steps=100, 
+                                            num_training_steps = num_train_optimization_steps)
+    
+    ### process to obtain the embeddings
+    for i in range(num_epochs):
+        for idx,batch_text in enumerate(dataloader):
+            with torch.no_grad():           
+                inputs = tokenizer(batch_text, padding=True, truncation=True, return_tensors="pt").to(device)
+                embeddings = model(**inputs, output_hidden_states=True, return_dict=True).pooler_output     
+                print(embeddings.size())
+
+            ### attacker part, needs training
+            if need_proj:
+               embeddings = projection(embeddings)
+
+            record_loss, perplexity = train_on_batch(
+                batch_X=embeddings,
+                batch_D=batch_text,
+                model=model_attacker,
+                tokenizer=tokenizer_attacker,
+                criterion=criterion,
+                device=device,
+                train=True
+            )
+            optimizer.step()
+            scheduler.step()
+            # make sure no grad for GPT optimizer
+            optimizer.zero_grad()
+            print(f'{embed_model_name}: Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}')
+        
+        if need_proj:
+            torch.save(projection.state_dict(), config['projection_save_path'])
+        
+        model_attacker.save_pretrained(config['attacker_save_path'])
+
 
 
 ### used for testing only
@@ -304,27 +415,48 @@ def process_data_test_simcse(
     return 0
 
 
-def train_on_batch(batch_X,batch_D,model,tokenizer,criterion,device,train=True):
-    padding_token_id = tokenizer.encode(tokenizer.eos_token)[0]
+def train_on_batch(
+        batch_X: torch.TensorType,
+        batch_D: torch.TensorType,
+        model,
+        tokenizer,
+        criterion,
+        device: torch.DeviceObjType,
+        train: bool = True
+    ):
+    """
+    batch_X: output from model f (victim model) with the sentence embeddings
+    batch_D: the text that the attacker needs to generate, in order to have a perfect inversion
+    """
+    # padding_token_id = tokenizer.encode(tokenizer.eos_token)[0]
     tokenizer.pad_token = tokenizer.eos_token
+
+    # tokenize the text (gt) needed for a perfect inversion
     inputs = tokenizer(batch_D, return_tensors='pt', padding='max_length', truncation=True, max_length=40)
     #dial_tokens = [tokenizer.encode(item) + turn_ending for item in batch_D]
     #print(inputs)
     input_ids = inputs['input_ids'].to(device) # tensors of input ids
     labels = input_ids.clone()
     #print(input_ids.size())
-    # embed the input ids using GPT-2 embedding
+
+    # embed the input ids of the gt text using GPT-2 embedding
     input_emb = model.transformer.wte(input_ids)
+    
     # add extra dim to cat together
     batch_X = batch_X.to(device)
     batch_X_unsqueeze = torch.unsqueeze(batch_X, 1)
-    inputs_embeds = torch.cat((batch_X_unsqueeze,input_emb),dim=1)   #[batch,max_length+1,emb_dim (1024)]
+    
+    # The first token becomes the sentence embedding
+    # Rest follows the gt text [Only for training]
+    # So the labels are leading always 1 to the ground truth as seen in Figure 2 of the paper
+    inputs_embeds = torch.cat((batch_X_unsqueeze, input_emb),dim=1) # [batch, 1 + max_length, emb_dim]
+    # print(inputs_embeds.size())
     past = None
     # need to move to device later
     inputs_embeds = inputs_embeds
 
     #logits, past = model(inputs_embeds=inputs_embeds,past = past)
-    logits, past = model(inputs_embeds=inputs_embeds,past_key_values  = past,return_dict=False)
+    logits, past = model(inputs_embeds=inputs_embeds, past_key_values=past, return_dict=False)
     logits = logits[:, :-1].contiguous()
     target = labels.contiguous()
     target_mask = torch.ones_like(target).float()
@@ -339,7 +471,6 @@ def train_on_batch(batch_X,batch_D,model,tokenizer,criterion,device,train=True):
 
 
 
-
 if __name__ == '__main__':
     model_cards = {}
     model_cards['sent_t5_large'] = 'sentence-t5-large'
@@ -350,18 +481,17 @@ if __name__ == '__main__':
     model_cards['sent_roberta'] = 'all-roberta-large-v1'
     model_cards['simcse_bert'] = 'princeton-nlp/sup-simcse-bert-large-uncased'
     model_cards['simcse_roberta'] = 'princeton-nlp/sup-simcse-roberta-large'
+    
     parser = argparse.ArgumentParser(description='Training external NN as baselines')
     parser.add_argument('--model_dir', type=str, default='microsoft/DialoGPT-large', help='Dir of your model')
     parser.add_argument('--num_epochs', type=int, default=10, help='Training epoches.')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch_size #.')
     parser.add_argument('--dataset', type=str, default='personachat', help='Name of dataset: personachat or qnli')
-    #parser.add_argument('--dataset', type=str, default='qnli', help='Name of dataset: personachat or qnli')
-    #parser.add_argument('--data_type', type=str, default='train', help='train/test')
     parser.add_argument('--data_type', type=str, default='test', help='train/test')
     parser.add_argument('--embed_model', type=str, default='sent_t5_base', help='Name of embedding model: mpnet/sent_roberta/simcse_bert/simcse_roberta/sent_t5')
     parser.add_argument('--decode', type=str, default='beam', help='Name of decoding methods: beam/sampling')
-    #parser.add_argument('--embed_model', type=str, default='simcse_roberta', help='Name of embedding model: mpnet/sent_roberta/simcse_bert/simcse_roberta/sent_t5')
     args = parser.parse_args()
+    
     config = {}
     config['model_dir'] = args.model_dir
     config['num_epochs'] = args.num_epochs
@@ -402,13 +532,13 @@ if __name__ == '__main__':
     elif config['model_dir'].find("large") != -1:
         attacker_emb_size = 1280
 
-    ##### for training
-    if(config['data_type'] == 'train'):
 
+    if(config['data_type'] == 'train'):
+        # -- Training --
         process_data(sent_list,batch_size,device,config,attacker_emb_size)
 
     elif(config['data_type'] == 'test'):
-       
+       # -- Inference --
         if('simcse' in config['embed_model']):
             process_data_test_simcse(sent_list,batch_size,device,config,proj_dir=None,need_proj=False)
         else:
