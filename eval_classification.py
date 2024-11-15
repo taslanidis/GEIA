@@ -2,13 +2,8 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from sklearn import metrics
 import numpy as np
-import argparse
-import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer
 import json
-from sentence_transformers import SentenceTransformer, util
-from scipy.spatial.distance import cosine
-from simcse import SimCSE
 import logging
 import logging.handlers
 from nltk.tokenize import word_tokenize
@@ -17,6 +12,7 @@ import re
 
 logger = logging.getLogger('mylogger')
 logger.setLevel(logging.DEBUG)
+os.makedirs('models_arr_feb',exist_ok=True)
 f_handler = logging.FileHandler('models_arr_feb/decoder_beam.log')
 f_handler.setLevel(logging.INFO)
 f_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s -  %(message)s"))
@@ -25,21 +21,27 @@ logger.addHandler(f_handler)
 def vectorize(sent_list,tokenizer):
     turn_ending = tokenizer.encode(tokenizer.eos_token)
     token_num = len(tokenizer)
+
+    # Tokenize each sentence and append the turn ending token
     dial_tokens = [tokenizer.encode(item) + turn_ending for item in sent_list]
-    dial_tokens_np = np.array(dial_tokens)
+
+    max_len = max(len(tokens) for tokens in dial_tokens)
+
+    # Pad each sequence to the maximum length
+    dial_tokens_padded = [tokens + [tokenizer.pad_token_id] * (max_len - len(tokens)) for tokens in dial_tokens]
+
+
+    #dial_tokens = [tokenizer.encode(item) + turn_ending for item in sent_list]
+    #print(dial_tokens)
+    dial_tokens_np = np.array(dial_tokens_padded)
     input_labels = []
     for i in dial_tokens_np:
+        i = [index for index in i if index is not None]
         temp_i = np.zeros(token_num)
         temp_i[i] = 1
         input_labels.append(temp_i)
     input_labels = np.array(input_labels)
-
-
     return input_labels
-
-
-
-
 
 def report_score(y_true,y_pred):
     # micro result should be reported
@@ -50,49 +52,6 @@ def report_score(y_true,y_pred):
     logger.info(f"micro recall_score on token level: {str(recall)}")
     logger.info(f"micro f1_score on token level: {str(f1)}")
 
-
-
-def embed_simcse(y_true,y_pred):
-    model = SimCSE("princeton-nlp/sup-simcse-roberta-large",device='cuda')
-    similarities = model.similarity(y_true, y_pred) # numpy array of N*N
-    pair_scores = similarities.diagonal()
-    for i,score in enumerate(pair_scores):
-        assert pair_scores[i] == similarities[i][i]
-    avg_score = np.mean(pair_scores)
-    logger.info(f'Evaluation on simcse-roberta with similarity score {avg_score}')
-
-
-def embed_sbert(y_true,y_pred):
-    model = SentenceTransformer('all-roberta-large-v1',device='cuda')       # has dim 768
-    embeddings_true = model.encode(y_true,convert_to_tensor = True)
-    embeddings_pred = model.encode(y_pred,convert_to_tensor = True)
-    cosine_scores = util.cos_sim(embeddings_true, embeddings_pred)
-    pair_scores = torch.diagonal(cosine_scores, 0)
-    for i,score in enumerate(pair_scores):
-        assert pair_scores[i] == cosine_scores[i][i]
-    avg_score = torch.mean(pair_scores)
-    logger.info(f'Evaluation on Sentence-bert with similarity score {avg_score}')
-
-
-    return avg_score
-
-
-def report_embedding_similarity(y_true,y_pred):
-    embed_sbert(y_true,y_pred)
-    embed_simcse(y_true,y_pred)
-
-
-def main(log_path):
-    with open(log_path, 'r') as f:
-        sent_dict = json.load(f)
-    y_true = sent_dict['gt']     # list of sentences
-    y_pred = sent_dict['pred']   # list of sentences   
-    report_embedding_similarity(y_true,y_pred)
-
-
-'''
-26/02 newly appended functions
-'''
 # remove punctuation from list of sentences 
 def punctuation_remove(sent_list):
     removed_list = []
@@ -206,13 +165,19 @@ if __name__ == '__main__':
     metric_token(mpnet_pc_path)
     '''
 
-    abcd_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_abcd_simcse_bert_beam.log'
-    mnli_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_mnli_simcse_bert_beam.log'
-    woz_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_multi_woz_simcse_bert_beam.log'
-    sst2_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_sst2_simcse_bert_beam.log'
-    wmt_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_wmt16_simcse_bert_beam.log'
+    # abcd_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_abcd_simcse_bert_beam.log'
+    # mnli_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_mnli_simcse_bert_beam.log'
+    # woz_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_multi_woz_simcse_bert_beam.log'
+    # sst2_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_sst2_simcse_bert_beam.log'
+    # wmt_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_wmt16_simcse_bert_beam.log'
 
-    path_list = [abcd_path,mnli_path,woz_path,sst2_path,wmt_path]
+    # path_list = [abcd_path,mnli_path,woz_path,sst2_path,wmt_path]
+
+    # Change this for the correct .log path
+    first = "./attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    second = "./attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+
+    path_list = [first, second]
     for p in path_list:
         logger.info(f'====={p}=====')
         metric_token(p)

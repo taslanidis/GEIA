@@ -55,6 +55,32 @@ class personachat(Dataset):
     def collate(self, unpacked_data):
         return unpacked_data
 
+def train_on_batch(batch_D,model,tokenizer,criterion,device,train=True):
+    padding_token_id = tokenizer.encode(tokenizer.eos_token)[0]
+    tokenizer.pad_token = tokenizer.eos_token
+    inputs = tokenizer(batch_D, return_tensors='pt', padding='max_length', truncation=True, max_length=40)
+
+    input_ids = inputs['input_ids'].to(device) # tensors of input ids
+    labels = input_ids.clone()
+
+    past = None
+
+    logits, past = model(input_ids,past_key_values  = past,return_dict=False)
+    logits = logits[:, :-1].contiguous()
+    target = labels[:, 1:].contiguous()
+
+    target_mask = torch.ones_like(target).float()
+
+    loss = criterion(logits, target, target_mask, label_smoothing=0.02, reduce="batch")   
+
+    record_loss = loss.item()
+    perplexity = np.exp(record_loss)
+    if train:
+        loss.backward()
+
+    return record_loss, perplexity
+
+
 def process_data(data,batch_size,device,config,need_porj=False):
     dataset = personachat(data)
     dataloader = DataLoader(dataset=dataset, 
@@ -104,34 +130,6 @@ def process_data(data,batch_size,device,config,need_porj=False):
 
         print(f'Validate ppl: {np.mean(running_ppl)}')
 
-
-
-def train_on_batch(batch_D,model,tokenizer,criterion,device,train=True):
-    padding_token_id = tokenizer.encode(tokenizer.eos_token)[0]
-    tokenizer.pad_token = tokenizer.eos_token
-    inputs = tokenizer(batch_D, return_tensors='pt', padding='max_length', truncation=True, max_length=40)
-
-    input_ids = inputs['input_ids'].to(device) # tensors of input ids
-    labels = input_ids.clone()
-
-    past = None
-
-    logits, past = model(input_ids,past_key_values  = past,return_dict=False)
-    logits = logits[:, :-1].contiguous()
-    target = labels[:, 1:].contiguous()
-
-    target_mask = torch.ones_like(target).float()
-
-    loss = criterion(logits, target, target_mask, label_smoothing=0.02, reduce="batch")   
-
-    record_loss = loss.item()
-    perplexity = np.exp(record_loss)
-    if train:
-        loss.backward()
-
-    return record_loss, perplexity
-
-
 def read_logs(path):
     with open(path) as f:
         data = json.load(f)
@@ -142,30 +140,32 @@ def get_val_ppl(path,batch_size,device,config):
     sent_list = read_logs(path)
     process_data(sent_list,batch_size,device,config)
 
-def get_qnli_data(data_type):
-    dataset = load_dataset('glue','qnli', cache_dir="/home/hlibt/embed_rev/data", split=data_type)
-    sentence_list = []
-    for i,d in enumerate(dataset):
-        sentence_list.append(d['question'])
-        sentence_list.append(d['sentence'])
-    return sentence_list
-def get_personachat_data(data_type):
+# def get_qnli_data(data_type):
+#     dataset = load_dataset('glue','qnli', cache_dir="/home/hlibt/embed_rev/data", split=data_type)
+#     sentence_list = []
+#     for i,d in enumerate(dataset):
+#         sentence_list.append(d['question'])
+#         sentence_list.append(d['sentence'])
+#     return sentence_list
 
-    sent_list = get_persona_dict(data_type=data_type)
-    return sent_list
+# def get_personachat_data(data_type):
+#     sent_list = get_persona_dict(data_type=data_type)
+#     return sent_list
 
-def get_sent_list(config):
-    dataset = config['dataset']
-    data_type = config['data_type']
-    if dataset == 'personachat':
-        sent_list = get_personachat_data(data_type)
-        return sent_list
-    elif dataset == 'qnli':
-        sent_list = get_qnli_data(data_type)
-        return sent_list
-    else:
-        print('Name of dataset only supports: personachat or qnli')
-        sys.exit(-1)
+# def get_sent_list(config):
+#     dataset = config['dataset']
+#     data_type = config['data_type']
+#     if dataset == 'personachat':
+#         sent_list = get_personachat_data(data_type)
+#         return sent_list
+#     elif dataset == 'qnli':
+#         sent_list = get_qnli_data(data_type)
+#         return sent_list
+#     else:
+#         print('Name of dataset only supports: personachat or qnli')
+#         sys.exit(-1)
+        
+        
 if __name__ == '__main__':
     model_cards ={}
     model_cards['sent_t5'] = 'sentence-t5-large'
@@ -213,7 +213,10 @@ if __name__ == '__main__':
     sentence_T5_large_pc_path = '../models_random/attacker_gpt2_qnli_sent_t5.log' 
     mpnet_pc_path = '../models_random/attacker_gpt2_qnli_mpnet.log'
     
+    first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
 
+    path_list = [first, second]
     
     print('===mpnet===')
     get_val_ppl(mpnet_pc_path,batch_size,device,config)
