@@ -96,7 +96,7 @@ def process_data(
     embedding_dimension: int = 768
     if config['embed_model_path'] == 'all-roberta-large-v1':
         embedding_dimension = 1024
-    elif config['embed_model_path'] == 'sent_t5_base':
+    elif config['embed_model_path'] == 'sent_t5_large':
         embedding_dimension = 1024
     elif config['embed_model_path'].find('simcse') != -1:
         embedding_dimension = 1024
@@ -182,7 +182,7 @@ def process_data_simcse(
         attacker_emb_size: int
     ):
     embed_model_name = config['embed_model']
-    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])  # dim 1024
+    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])
     model = AutoModel.from_pretrained(config['embed_model_path']).to(device)
     dataset = personachat(data)
     dataloader = DataLoader(dataset=dataset, 
@@ -196,7 +196,7 @@ def process_data_simcse(
     embedding_dimension: int = 768
     if config['embed_model_path'] == 'all-roberta-large-v1':
         embedding_dimension = 1024
-    elif config['embed_model_path'] == 'sent_t5_base':
+    elif config['embed_model_path'] == 'sent_t5_large':
         embedding_dimension = 1024
     elif config['embed_model_path'].find('simcse') != -1:
         embedding_dimension = 1024
@@ -206,7 +206,7 @@ def process_data_simcse(
 
     ### extra projection
     if need_proj:
-        projection = linear_projection(in_num=embedding_dimension).to(device)
+        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size).to(device)
 
     ### for attackers
     ### TODO: make a function to create the model/tokenizer parametrized on model_dir
@@ -298,7 +298,7 @@ def process_data_test(
     embedding_dimension: int = 768
     if config['embed_model_path'] == 'all-roberta-large-v1':
         embedding_dimension = 1024
-    elif config['embed_model_path'] == 'sent_t5_base':
+    elif config['embed_model_path'] == 'sent_t5_large':
         embedding_dimension = 1024
     elif config['embed_model_path'].find('simcse') != -1:
         embedding_dimension = 1024
@@ -307,7 +307,7 @@ def process_data_test(
     need_proj: bool = attacker_emb_size != embedding_dimension
 
     if need_proj:
-        projection = linear_projection(in_num=embedding_dimension, out_num=1280)
+        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size)
         projection.load_state_dict(torch.load(config['projection_save_path']))
         projection.to(device)
         print('load projection done')
@@ -353,10 +353,9 @@ def process_data_test_simcse(
         batch_size: int,
         device: torch.device,
         config: dict,
-        proj_dir=None,
-        need_proj=False
+        attacker_emb_size: int
     ):
-    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])  # dim 1024
+    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])
     model = AutoModel.from_pretrained(config['embed_model_path']).to(device)
 
     if(config['decode'] == 'beam'):
@@ -374,9 +373,20 @@ def process_data_test_simcse(
 
     print('load data done')
     
+    embedding_dimension: int = 768
+    if config['embed_model_path'] == 'all-roberta-large-v1':
+        embedding_dimension = 1024
+    elif config['embed_model_path'] == 'sent_t5_large':
+        embedding_dimension = 1024
+    elif config['embed_model_path'].find('simcse') != -1:
+        embedding_dimension = 1024
+
+    # projection needed if sizes are different
+    need_proj: bool = attacker_emb_size != embedding_dimension
+
     if need_proj:
-        projection = linear_projection(in_num=768)
-        projection.load_state_dict(torch.load(proj_dir))
+        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size)
+        projection.load_state_dict(torch.load(config['projection_save_path']))
         projection.to(device)
         print('load projection done')
     else:
@@ -535,12 +545,15 @@ if __name__ == '__main__':
 
     if(config['data_type'] == 'train'):
         # -- Training --
-        process_data(sent_list,batch_size,device,config,attacker_emb_size)
+        if('simcse' in config['embed_model']):
+            process_data_simcse(sent_list,batch_size,device,config,attacker_emb_size)
+        else:
+            process_data(sent_list,batch_size,device,config,attacker_emb_size)
 
     elif(config['data_type'] == 'test'):
-       # -- Inference --
+        # -- Inference --
         if('simcse' in config['embed_model']):
-            process_data_test_simcse(sent_list,batch_size,device,config,proj_dir=None,need_proj=False)
+            process_data_test_simcse(sent_list,batch_size,device,config,attacker_emb_size=attacker_emb_size)
         else:
             process_data_test(sent_list,batch_size,device,config,attacker_emb_size=attacker_emb_size)
 
