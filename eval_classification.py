@@ -173,8 +173,9 @@ if __name__ == '__main__':
 
     # path_list = [abcd_path,mnli_path,woz_path,sst2_path,wmt_path]
 
-    first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
-    second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    # Change this for the correct .log path
+    first = "./attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    second = "./attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
 
     path_list = [first, second]
     for p in path_list:
