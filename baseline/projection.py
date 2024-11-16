@@ -42,7 +42,7 @@ torch.autograd.set_detect_anomaly(True)
 
 logger = logging.getLogger('mylogger')
 logger.setLevel(logging.DEBUG)
-f_handler = logging.FileHandler('logs/new_datasets.log')
+f_handler = logging.FileHandler('logs_correct_thres_DialoGPT-medium/new_datasets.log')
 f_handler.setLevel(logging.INFO)
 f_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s -  %(message)s"))
 logger.addHandler(f_handler)
@@ -215,7 +215,7 @@ def train_sent(dataloader, model_name, embed_model_dim, config):
     model = SentenceTransformer(model_name, device=device)
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    save_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
 
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -261,7 +261,7 @@ def train_simcse(dataloader, model_name, embed_model_dim, config):
     num_epochs = config['num_epochs']
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    save_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
     
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -329,7 +329,7 @@ def eval_sent(dataloader, model_name, embed_model_dim, config):
     hx = torch.zeros(64, 512).cuda()
 
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    model_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    model_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
     baseline_model.load_state_dict(torch.load(model_path))
     baseline_model.eval()
 
@@ -374,7 +374,7 @@ def eval_simcse(dataloader, model_name, embed_model_dim, config):
     num_epochs = config['num_epochs']
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    model_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    model_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
     baseline_model.load_state_dict(torch.load(model_path))
     baseline_model.eval()
     log_text = model_path
@@ -442,7 +442,7 @@ def eval_label(pred_labels,ground_truth,input, config,type = 'NN'):
         ####log_text = model_path+'_threshold_'+str(threshold)
         str_threshold = f'{threshold:.2f}'
         # save_path = 'qnli/' + type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
-        save_path = 'logs_test/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
+        save_path = 'logs_test_correct_thres_DialoGPT-medium/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
         for idx,label_list in enumerate(pred_labels):
@@ -472,7 +472,7 @@ def eval_label(pred_labels,ground_truth,input, config,type = 'NN'):
         tokenizer = config['tokenizer']
         pred = [[] for i in range(len(pred_labels))]
         gt = [[] for i in range(len(pred_labels))]
-        save_path = 'logs_test/' +'test_' + type + '_' + config['dataset'] + '_' + config['embed_model'] + '.label'
+        save_path = 'logs_test_correct_thres_DialoGPT-medium/' +'test_' + type + '_' + config['dataset'] + '_' + config['embed_model'] + '.label'
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         # save_path = 'logs_test/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label
 
@@ -513,7 +513,7 @@ if __name__ == '__main__':
     ['personachat'.'qnli','mnli','sst2','wmt16','multi_woz','abcd']
     '''
     parser = argparse.ArgumentParser(description='Training external NN as baselines')
-    parser.add_argument('--model_dir', type=str, default='microsoft/DialoGPT-medium', help='Dir of your model')
+    parser.add_argument('--model_dir', type=str, default='baseline_weights/DialoGPT-medium', help='Dir of your model')
     parser.add_argument('--num_epochs', type=int, default=10, help='Training epoches.')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch_size #.')
     parser.add_argument('--dataset', type=str, default='abcd', help="List of supported datasets: ['personachat'.'qnli','mnli','sst2','wmt16','multi_woz','abcd']")
@@ -528,6 +528,7 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     config = {}
+    model_thres = {'mpnet': 0.2, 'sent_roberta': 0.2, 'simcse_bert': 0.5, 'simcse_roberta': 0.5, 'sent_t5': 0.1}
     config['model_dir'] = args.model_dir
     config['num_epochs'] = args.num_epochs
     config['batch_size'] = args.batch_size
@@ -535,10 +536,11 @@ if __name__ == '__main__':
     config['data_type'] = args.data_type
     config['embed_model'] = args.embed_model
     config['model_type'] = args.model_type
-    config['threshold'] = 0.3
+    
+    config['threshold'] = model_thres[args.embed_model]
 
     config['device'] = torch.device("cuda")
-    config['tokenizer'] = AutoTokenizer.from_pretrained('microsoft/DialoGPT-medium')
+    config['tokenizer'] = AutoTokenizer.from_pretrained(args.model_dir)
     config['eos_token'] = config['tokenizer'].eos_token
     config['tokenizer'].pad_token = config['eos_token']
     sent_list = get_sent_list(config)
@@ -554,7 +556,17 @@ if __name__ == '__main__':
     if config['data_type'] == 'train':
         get_embedding(dataloader, config, eval=False)
     # for evaluation
+    config['batch_size'] = args.batch_size
+    config['dataset'] = args.dataset
     config['data_type'] = 'test'
+    config['embed_model'] = args.embed_model
+    config['model_type'] = args.model_type
+    config['threshold'] = model_thres[args.embed_model]
+
+    config['device'] = torch.device("cuda")
+    config['tokenizer'] = AutoTokenizer.from_pretrained(args.model_dir)
+    config['eos_token'] = config['tokenizer'].eos_token
+    config['tokenizer'].pad_token = config['eos_token']
     sent_list = get_sent_list(config)
 
     #dataset = sent_list_dataset(sent_list, onehot_labels)
