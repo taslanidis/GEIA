@@ -1,6 +1,6 @@
 import os
 import sys
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 #sys.path.append('..')
 #from text_eval import punctuation_remove
 import evaluate
@@ -170,12 +170,25 @@ if __name__ == '__main__':
     sst2_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_sst2_simcse_bert_beam.log'
     wmt_path = '/home/hlibt/embed_rev/models_arr_feb/attacker_gpt2_wmt16_simcse_bert_beam.log'
 
-    path_list = [abcd_path,mnli_path,woz_path,sst2_path,wmt_path]
 
-    first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
-    second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    # abcd_path = 'logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log'
+    # mnli_path = '/home/marina/GEIA/logs//models_arr_feb/attacker_gpt2_mnli_simcse_bert_beam.log'
+    # woz_path = '/home/marina/GEIA/logs//models_arr_feb/attacker_gpt2_multi_woz_simcse_bert_beam.log'
+    # sst2_path = '/home/marina/GEIA/logs//models_arr_feb/attacker_gpt2_sst2_simcse_bert_beam.log'
+    # wmt_path = '/home/marina/GEIA/logs//models_arr_feb/attacker_gpt2_wmt16_simcse_bert_beam.log'
 
-    path_list = [first, second]
+    # path_list = [abcd_path,mnli_path,woz_path,sst2_path,wmt_path]
+
+    first = "logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    second = "logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log"
+    third = "logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    forth = "logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log"
+    fifth = "logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log"
+    six = "logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log"
+    seven = "logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log"
+    eight = "logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log"
+
+    path_list = [first, second, third, forth, fifth, six, seven, eight]
     for p in path_list:
         print(f'==={p}===')
         data = read_gpt(p)
