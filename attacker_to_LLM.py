@@ -27,14 +27,14 @@ from datasets import load_dataset
 from data_process import get_sent_list
 
 class Sentence_Embedding_model(nn.Module):
-    def __init__(self,embedding_dim, sequence_length, type):
-        if config["sentenence_aggregation"].lower() == "mean":
+    def __init__(self,embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean"):
+        if model_type == "mean":
             self.model = MeanMapping()
-        elif config["sentenence_aggregation"].lower() == "convolution":
+        elif model_type == "convolution":
             self.model = Conv1DMapping(embedding_dim, sequence_length)
-        elif config["sentenence_aggregation"].lower() == "self-attention":
-            raise Exception("Not implemanted yet")
-        elif config["sentenence_aggregation"].lower() == "encoder":
+        elif model_type == "self-attention":
+            raise MultiheadAttentionMapping(embedding_dim, num_heads=4)
+        elif model_type == "encoder":
             raise Exception("Not implemanted yet")
         else:
             raise Exception("Not understand")
@@ -74,6 +74,29 @@ class Conv1DMapping(nn.Module):
         x = self.flatten(x)  # Shape: [batch, embedding]
         return x
 
+class MultiheadAttentionMapping(nn.Module):
+    def __init__(self, embedding_dim, num_heads):
+        super(MultiheadAttentionMapping, self).__init__()
+        # MultiheadAttention layer
+        self.multihead_attention = nn.MultiheadAttention(embed_dim=embedding_dim, num_heads=num_heads, batch_first=True)
+
+    def forward(self, x):
+        """
+        Args:
+            x: Tensor of shape (batch_size, sequence_length, embedding_dim)
+        Returns:
+            sentence_embedding: Tensor of shape (batch_size, embedding_dim)
+        """
+        # Use the input as both query, key, and value for self-attention
+        # self.multihead_attention expects (batch_size, sequence_length, embedding_dim)
+        attended_output, _ = self.multihead_attention(x, x, x)
+        
+        # Aggregate sequence features to create a sentence embedding
+        # Here, using mean pooling. Other methods (e.g., max pooling, weighted sum) can also be used.
+        sentence_embedding = attended_output.mean(dim=1)  # (batch_size, embedding_dim)
+
+        return sentence_embedding
+    
 class linear_projection(nn.Module):
     
     def __init__(self, in_num, out_num=1024):
@@ -144,8 +167,8 @@ def process_data(
     if config['embed_model_path'].find("Mistral") != -1:
         embedding_dimension = 4096
 
-    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dimension, sequence_length)
-    print(embedding_dimension)
+    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=10, model_type=config["sentenence_aggregation"])
+    
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
 
@@ -177,6 +200,8 @@ def process_data(
                   eps=1e-06)
     if need_proj:
         optimizer.add_param_group({'params': projection.parameters()})
+        
+    optimizer.add_param_group({'params': sentence_embedding_reduction.parameters()})
     
     scheduler = get_linear_schedule_with_warmup(optimizer, 
                                             num_warmup_steps=100, 
@@ -226,6 +251,7 @@ def process_data(
         
         if need_proj:
             torch.save(projection.state_dict(), config['projection_save_path'])
+        torch.save(sentence_embedding_reduction.state_dict(), config['sentence_embedding_reduction_save_path'])
         model_attacker.save_pretrained(config['attacker_save_path'])
 
 
@@ -569,8 +595,10 @@ if __name__ == '__main__':
     attacker_model: str = "rand_gpt2_m" if args.model_dir == "random_gpt2_medium" else "dialogpt2"
     attacker_save_name: str = f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}"
     projection_save_name: str = f"projection_{attacker_model}_{config['dataset']}_{config['embed_model']}"
+    sentence_embedding_reduction_save_name: str = f"sentence_embedding_reduction_{attacker_model}_{config['dataset']}_{config['embed_model']}"
     config['attacker_save_path'] = f"models/{attacker_save_name}"
     config['projection_save_path'] = f"models/{projection_save_name}"
+    config['sentence_embedding_reduction_save_path'] = f"models/{sentence_embedding_reduction_save_name}"
     config['attacker_save_name'] = attacker_save_name
     config['projection_save_name'] = projection_save_name
 

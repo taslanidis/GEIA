@@ -1,8 +1,8 @@
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
-import torch, gc
-torch.cuda.empty_cache()
+# import torch, gc
+# torch.cuda.empty_cache()
 
 import sys
 sys.path.append('..')
@@ -10,7 +10,7 @@ sys.path.append('..')
 import json
 
 from nltk.corpus import stopwords
-
+import numpy as np
 
 # tokenizer = AutoTokenizer.from_pretrained('microsoft/DialoGPT-medium')
 stopwords_list = stopwords.words('english')
@@ -19,7 +19,7 @@ for w in ['!',',','.','?','-s','-ly','</s>','s']:
 stopwords_set  = set(stopwords_list)
 # for NN or RNN result
 file_list = ['path to NN OR RNN result']
-
+file_list = []
 
 for file in file_list:
     
@@ -66,9 +66,23 @@ for file in file_list:
         print("swr_pred:", end = '')
         print(swr_pred)
 
-
+        print("diff:", end = '')
+        print(swr_pred - swr_gt, end=' ')
+        print(np.round(swr_pred - swr_gt, 4)*100)
+        print("--------------------")
+        
 # for GPT result
-file_list = ['path to GPT result']
+file_list = ["logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log",
+            "logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log",
+            "logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log",
+            "logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log",
+            "logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log",
+            "logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log",
+            "logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log",
+            "logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log",
+            "logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log",
+            "logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log",
+            ]
 
 for file in file_list:
     gt_count = 0
@@ -112,3 +126,8 @@ for file in file_list:
         print("swr_pred:", end = '')
         print(swr_pred)
         print()
+        
+        print("diff:", end = '')
+        print(swr_pred - swr_gt, end=' ')
+        print(np.round(swr_pred - swr_gt, 4)*100)
+        print("--------------------")
