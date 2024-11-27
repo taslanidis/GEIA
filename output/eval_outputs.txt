@@ -1,0 +1,116 @@
+$ CUDA_VISIBLE_DEVICES=3 python eval_generation.py 
+/home/marina/GEIA/.env/lib/python3.10/site-packages/sentence_transformers/models/Dense.py:63: FutureWarning: You are using torch.load with weights_only=False (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for weights_only will be flipped to True. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via torch.serialization.add_safe_globals. We recommend you start setting weights_only=True for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model.load_state_dict(torch.load(os.path.join(input_path, 'pytorch_model.bin'), map_location=torch.device('cpu')))
+===logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log===
+{'rouge1': np.float64(0.593402669387914), 'rouge2': np.float64(0.39892882447108646), 'rougeL': np.float64(0.5574791731640002), 'rougeLsum': np.float64(0.5575267265439325)}
+bleu1 : 0.3624432925877433
+bleu2 : 0.2711401623575574
+bleu : 0.1553373825652192
+exact_match ratio: 0.031784005468216
+exact_match ratio after removing punctuation: 0.13820915926179084
+edit_mean: 26.17464114832536
+edit_median: 26.0
+^[[C^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[BAvg embed similarity: 0.8835548466309568
+===logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log===
+{'rouge1': np.float64(0.7187062033949518), 'rouge2': np.float64(0.5230400421686491), 'rougeL': np.float64(0.6602984692368388), 'rougeLsum': np.float64(0.6602283430431701)}
+bleu1 : 0.4609943852191574
+bleu2 : 0.36363870403885695
+bleu : 0.2269633450156565
+exact_match ratio: 0.04935064935064935
+exact_match ratio after removing punctuation: 0.20403280929596718
+edit_mean: 22.468967874231033
+edit_median: 21.0
+Avg embed similarity: 0.9179092062472971
+===logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log===
+{'rouge1': np.float64(0.7276256462442654), 'rouge2': np.float64(0.521655870401966), 'rougeL': np.float64(0.6574628510227994), 'rougeLsum': np.float64(0.6574463841729263)}
+bleu1 : 0.47306525765288265
+bleu2 : 0.3712850258931785
+bleu : 0.22930873240706887
+exact_match ratio: 0.045522898154477104
+exact_match ratio after removing punctuation: 0.197676008202324
+edit_mean: 23.038687628161313
+edit_median: 21.0
+Avg embed similarity: 0.9175549840894531
+===logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log===
+{'rouge1': np.float64(0.6942158578281192), 'rouge2': np.float64(0.47960511772616554), 'rougeL': np.float64(0.6286867746621678), 'rougeLsum': np.float64(0.6286844628288235)}
+bleu1 : 0.4428448408838297
+bleu2 : 0.3400011993395267
+bleu : 0.20195986416044834
+exact_match ratio: 0.03943950786056049
+exact_match ratio after removing punctuation: 0.16828434723171565
+edit_mean: 24.103417634996582
+edit_median: 23.0
+Avg embed similarity: 0.9185803177335534
+===logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log===
+{'rouge1': np.float64(0.32676064811770444), 'rouge2': np.float64(0.11738266916380406), 'rougeL': np.float64(0.28625129917603925), 'rougeLsum': np.float64(0.2862205959159307)}
+bleu1 : 0.18031505860318997
+bleu2 : 0.09732561718810204
+bleu : 0.03577493167455402
+exact_match ratio: 0.003935566538531942
+exact_match ratio after removing punctuation: 0.003935566538531942
+edit_mean: 84.98132894014277
+edit_median: 61.0
+Avg embed similarity: 0.8021805504619606
+===logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log===
+{'rouge1': np.float64(0.3827508292315819), 'rouge2': np.float64(0.1644826067516765), 'rougeL': np.float64(0.3398784175403512), 'rougeLsum': np.float64(0.339874718191561)}
+bleu1 : 0.2018639347343677
+bleu2 : 0.11895496976753474
+bleu : 0.04975138479934315
+exact_match ratio: 0.007688083470620538
+exact_match ratio after removing punctuation: 0.007779608273842211
+edit_mean: 82.73430349624748
+edit_median: 58.0
+Avg embed similarity: 0.8122563542855783
+===logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log===
+{'rouge1': np.float64(0.39143445156932233), 'rouge2': np.float64(0.16700556720722054), 'rougeL': np.float64(0.34391640067547236), 'rougeLsum': np.float64(0.34382317023209014)}
+bleu1 : 0.20506930793164155
+bleu2 : 0.12103904369368873
+bleu : 0.051572069655298515
+exact_match ratio: 0.009518579535054
+exact_match ratio after removing punctuation: 0.009518579535054
+edit_mean: 83.23961193483434
+edit_median: 59.0
+Avg embed similarity: 0.822094047814744
+===logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log===
+{'rouge1': np.float64(0.38490488579702575), 'rouge2': np.float64(0.15676112785565854), 'rougeL': np.float64(0.3357914499749802), 'rougeLsum': np.float64(0.33575434640418483)}
+bleu1 : 0.19651831153092225
+bleu2 : 0.11333005529652578
+bleu : 0.04666621891485697
+exact_match ratio: 0.008603331502837269
+exact_match ratio after removing punctuation: 0.008694856306058941
+edit_mean: 83.71004942339374
+edit_median: 59.0
+
+
+
+CUDA_VISIBLE_DEVICES=3 python eval_ppl.py 
+/home/marina/GEIA/.env/lib/python3.10/site-packages/huggingface_hub/file_download.py:1142: FutureWarning: resume_download is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use force_download=True.                                                                                                                                                                                                                                                                B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^
+  warnings.warn(                                                                                                                                                                                                                                                                                                                                         [[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B^[[B
+===logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log===
+load data done                                                                                                                                                                                                                                                             load=True`.
+/home/marina/GEIA/.env/lib/python3.10/site-packages/huggingface_hub/file_download.py:1142: FutureWarning: resume_download is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use force_download=True.
+  warnings.warn(
+/home/marina/GEIA/.env/lib/python3.10/site-packages/transformers/optimization.py:521: FutureWarning: This implementation of AdamW is deprecated and will be removed in a future version. Use the PyTorch implementation torch.optim.AdamW instead, or set no_deprecation_wload=True.arning=True` to disable this warning
+  warnings.warn(                                                                                                                                                                                                                                                           arning=True` to disable this warning
+Validate ppl: 199.91102581818868
+===logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log===
+load data done
+Validate ppl: 219.03689173055028
+===logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log===
+load data done
+Validate ppl: 225.79922560129992
+===logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log===
+load data done
+Validate ppl: 222.8695157903955
+===logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log===
+load data done
+Validate ppl: 197.4963577104835
+===logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log===                                                                                                                                                                                                                                                                                                                                                                                                                                        
+load data done
+Validate ppl: 193.29415837064442
+===logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log===
+load data done
+Validate ppl: 186.83423771239157
+===logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log===
+load data done
+Validate ppl: 177.63729042264023
