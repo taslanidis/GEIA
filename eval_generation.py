@@ -187,8 +187,11 @@ if __name__ == '__main__':
     six = "logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log"
     seven = "logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log"
     eight = "logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log"
-
-    path_list = [first, second, third, forth, fifth, six, seven, eight]
+    
+    nine = "logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log"
+    ten = "logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log"
+    path_list = [nine, ten]
+    # path_list = [first, second, third, forth, fifth, six, seven, eight]
     for p in path_list:
         print(f'==={p}===')
         data = read_gpt(p)

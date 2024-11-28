@@ -227,9 +227,13 @@ if __name__ == '__main__':
     seven = "logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log"
     eight = "logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log"
 
-    path_list = [first, second, third, forth, fifth, six, seven, eight]
+    nine = "logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log"
+    ten = "logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log"
+
+    # path_list = [first, second, third, forth, fifth, six, seven, eight]
     
-    path_list = [first, second, third, forth, fifth, six, seven, eight]
+    # path_list = [first, second, third, forth, fifth, six, seven, eight]
+    path_list = [nine, ten]
     for p in path_list:
         print(f'==={p}===')
         get_val_ppl(p,batch_size,device,config)
