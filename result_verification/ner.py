@@ -12,6 +12,8 @@ tokenizer = AutoTokenizer.from_pretrained('microsoft/DialoGPT-medium')
 print("start_2")
 # for gpt result
 file_list = [
+	    "logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log",
+            "logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log",
 	    #"logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log",
             #"logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log",
             #"logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log",
@@ -124,16 +126,16 @@ for file in file_list:
 
 # for RNN result
 file_list = [
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_mpnet.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_sent_roberta.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_sent_t5.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_simcse_bert.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_simcse_roberta.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_mpnet.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_sent_roberta.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_sent_t5.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_simcse_bert.label",
-"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_simcse_roberta.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_mpnet.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_sent_roberta.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_sent_t5.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_simcse_bert.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_personachat_simcse_roberta.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_mpnet.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_sent_roberta.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_sent_t5.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_simcse_bert.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_RNN_qnli_simcse_roberta.label",
 ]
 
 
@@ -193,16 +195,18 @@ for file in file_list:
 
 
 # for NN result
-file_list = ["logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_mpnet_threshold_0.20.label",
-"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_sent_roberta_threshold_0.20.label",
-"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_sent_t5_threshold_0.10.label",
-"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_simcse_bert_threshold_0.50.label",
-"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_simcse_roberta_threshold_0.50.label",
-"logs/logs_test_correct_thres_gpt2-large_test_NN_qnli_mpnet_threshold_0.20.label",
-"logs/logs_test_correct_thres_gpt2-large_test_NN_qnli_sent_roberta_threshold_0.20.label",
-"logs/logs_test_correct_thres_gpt2-large_test_NN_qnli_sent_t5_threshold_0.10.label",
-"logs/test_NN_qnli_simcse_bert_threshold_0.50.label",
-"logs/test_NN_qnli_simcse_roberta_threshold_0.50.label",]
+file_list = [
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_mpnet_threshold_0.20.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_sent_roberta_threshold_0.20.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_sent_t5_threshold_0.10.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_simcse_bert_threshold_0.50.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_personachat_simcse_roberta_threshold_0.50.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_qnli_mpnet_threshold_0.20.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_qnli_sent_roberta_threshold_0.20.label",
+	#"logs/logs_test_correct_thres_gpt2-large_test_NN_qnli_sent_t5_threshold_0.10.label",
+	#"logs/test_NN_qnli_simcse_bert_threshold_0.50.label",
+	#"logs/test_NN_qnli_simcse_roberta_threshold_0.50.label",
+]
 for file in file_list:
     with open(file) as f:
         print(file)

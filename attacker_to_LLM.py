@@ -1,4 +1,6 @@
 import os
+from tqdm import tqdm
+import copy
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -27,15 +29,19 @@ from datasets import load_dataset
 from data_process import get_sent_list
 
 class Sentence_Embedding_model(nn.Module):
-    def __init__(self,embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean"):
+    def __init__(self, embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean"):
+        super(Sentence_Embedding_model, self).__init__()
+
         if model_type == "mean":
             self.model = MeanMapping()
+        elif model_type == "linear":
+            self.model = LinearMapping(sequence_length)
         elif model_type == "convolution":
             self.model = Conv1DMapping(embedding_dim, sequence_length)
         elif model_type == "self-attention":
-            raise MultiheadAttentionMapping(embedding_dim, num_heads=4)
+            self.model = MultiheadAttentionMapping(embedding_dim, num_heads=4)
         elif model_type == "encoder":
-            raise Exception("Not implemanted yet")
+            raise Exception("Not implemented")
         else:
             raise Exception("Not understand")
     
@@ -49,6 +55,19 @@ class MeanMapping(nn.Module):
     def forward(self, x):
         return torch.mean(x,dim=1)
 
+class LinearMapping(nn.Module):
+    def __init__(self, sequence_length):
+        super(LinearMapping, self).__init__()
+        self.fc1 = nn.Linear(sequence_length, 1)
+
+    def forward(self, x):
+        batch,length,embedding = x.shape
+        x_permuted = x.permute(0,2,1)
+        out = self.fc1(x_permuted)
+        out = out.squeeze()
+        out = out.reshape(batch,embedding)
+        return out
+
 class Conv1DMapping(nn.Module):
     def __init__(self, embedding_dim, sequence_length):
         super(Conv1DMapping, self).__init__()
@@ -56,22 +75,18 @@ class Conv1DMapping(nn.Module):
                                out_channels=sequence_length // 2, 
                                kernel_size=3, 
                                padding=1)  # Reduce sequence length by half
-        self.pool1 = nn.MaxPool1d(kernel_size=2)  # Reduce length further by 2
         self.conv2 = nn.Conv1d(in_channels=sequence_length // 2, 
                                out_channels=1, 
                                kernel_size=3, 
                                padding=1)  # Collapse to 1 channel
-        self.pool2 = nn.AdaptiveMaxPool1d(1)  # Reduce sequence dimension to 1
-        self.flatten = nn.Flatten()
 
     def forward(self, x):
         # x is of shape [batch, length, embedding]
-        x = x.permute(0, 2, 1)  # Rearrange to [batch, embedding, length]
-        x = self.conv1(x)  # Shape: [batch, embedding, length / 2]
-        x = self.pool1(x)  # Shape: [batch, embedding, length / 4]
-        x = self.conv2(x)  # Shape: [batch, 1, length / 4]
-        x = self.pool2(x)  # Shape: [batch, 1, 1]
-        x = self.flatten(x)  # Shape: [batch, embedding]
+        batch,length,embedding = x.shape
+        x = self.conv1(x)  # Shape: [batch, length / 2, embedding]
+        x = torch.relu(x)
+        x = self.conv2(x)  # Shape: [batch, 1, embedding]
+        x = x.reshape(batch,embedding)  # Shape: [batch, embedding]
         return x
 
 class MultiheadAttentionMapping(nn.Module):
@@ -106,6 +121,7 @@ class linear_projection(nn.Module):
     def forward(self, x, use_final_hidden_only = True):
         # x should be of shape (?,in_num) according to gpt2 output
         out_shape = x.size()[-1]
+        print(x.size())
         assert(x.size()[1] == out_shape)
         out = self.fc1(x)
         return out
@@ -125,23 +141,32 @@ def init_opt():
     return model, tokenizer
 
 
-class personachat(Dataset):
+class the_dataset(Dataset):
     
-    def __init__(self, data, model_tokenizer, device):
+    def __init__(self, data, model_tokenizer, device, max_value=None):
         self.data = data
         self.model_tokenizer = model_tokenizer 
         self.model_tokenizer.pad_token = self.model_tokenizer.eos_token
         self.device = device
+        if max_value is None:
+            self.max_value = max([len(i.split(" ")) for i in self.data])+2
+        else:
+            self.max_value = max_value
+
     def __len__(self):
         return len(self.data)
+
+    def max(self):
+        return self.max_value
     
     def __getitem__(self, index):
         text = self.data[index]
         return  text
         
     def collate(self, unpacked_data):
-        return unpacked_data, self.model_tokenizer(unpacked_data,return_tensors="pt", padding=True).to(device=self.device)
-
+        # truncation=True is needed but does nothing!
+        tokenized = self.model_tokenizer(unpacked_data,return_tensors="pt", truncation=True, padding='max_length', max_length=self.max_value).to(device=self.device)
+        return unpacked_data, tokenized 
 
 def process_data(
         data, 
@@ -156,7 +181,7 @@ def process_data(
     base_model = model.base_model
     lm_head = model.lm_head
     tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'], padding_side="left")
-    dataset = personachat(data, tokenizer, device)
+    dataset = the_dataset(data, tokenizer, device, config["max_length"])
     dataloader = DataLoader(dataset=dataset, 
                               shuffle=True, 
                               batch_size=batch_size, 
@@ -166,8 +191,10 @@ def process_data(
     embedding_dimension: int = 768
     if config['embed_model_path'].find("Mistral") != -1:
         embedding_dimension = 4096
+    elif config['embed_model_path'].find("meta") != -1:
+        embedding_dimension = 4096
 
-    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=10, model_type=config["sentenence_aggregation"])
+    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=dataset.max(), model_type=config["sentence_aggregation"]).to(device)
     
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
@@ -212,23 +239,29 @@ def process_data(
     # 3. Train the attacker, by:
     #     3.a Taking the sentence embedding and generating text
     #     3.b Calculate the loss compared of the generated text, and the GT text
+    count=0
     for i in range(num_epochs):
         base_model.eval()
         lm_head.eval()
-        for idx, (batch_text,batch_tokenized_text) in enumerate(dataloader):
+        for idx, (batch_text,batch_tokenized_text) in enumerate(tqdm(dataloader, desc="Processing Batches")):
             with torch.no_grad():       
                 output = base_model(**batch_tokenized_text)
                 
                 hidden_state = output.last_hidden_state
-                
-                lm_head_logits = lm_head(hidden_state)  
-                
-            print("ANSWERS:",tokenizer.decode(torch.argmax(lm_head_logits, dim=-1)[0]))
-            print(f'Embedding dim: {hidden_state.size()}')
+
             # Aggregate everything to a single sentence
-            
-            print(f'Embedding dim: {embeddings.size()}')
-            exit()
+            embeddings =  sentence_embedding_reduction(hidden_state)  
+
+            # print("batch_text:", batch_text)
+            # print("batch_tokenized_text",batch_tokenized_text.keys())
+            # print("decoded batch_text:",tokenizer.decode(batch_tokenized_text["input_ids"][0],skip_special_tokens=True))
+            output = base_model(**batch_tokenized_text)
+                
+            hidden_state = output.last_hidden_state
+
+            # output = lm_head(hidden_state)
+            # print("DECODED:")
+            # print(tokenizer.decode(torch.argmax(output[0],-1),skip_special_tokens=True))
 
             # attacker part, needs training
             if need_proj:
@@ -248,111 +281,14 @@ def process_data(
             # make sure no grad for GPT optimizer
             optimizer.zero_grad()
             print(f'Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}')
-        
+            if count ==1417:
+                break
+            count+=1
         if need_proj:
             torch.save(projection.state_dict(), config['projection_save_path'])
         torch.save(sentence_embedding_reduction.state_dict(), config['sentence_embedding_reduction_save_path'])
         model_attacker.save_pretrained(config['attacker_save_path'])
-
-
-def process_data_simcse(
-        data,
-        batch_size: int,
-        device: torch.device,
-        config: dict,
-        attacker_emb_size: int
-    ):
-    embed_model_name = config['embed_model']
-    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])
-    model = AutoModel.from_pretrained(config['embed_model_path']).to(device)
-    dataset = personachat(data)
-    dataloader = DataLoader(dataset=dataset, 
-                              shuffle=True, 
-                              batch_size=batch_size, 
-                              collate_fn=dataset.collate)
-
-    print('load data done')
-
-    # TODO: Create a function for this to be re-usable
-    embedding_dimension: int = 768
-    if config['embed_model_path'] == 'all-roberta-large-v1':
-        embedding_dimension = 1024
-    elif config['embed_model_path'] == 'sent_t5_large':
-        embedding_dimension = 1024
-    elif config['embed_model_path'].find('simcse') != -1:
-        embedding_dimension = 1024
-    elif config['embeded_model_path'].find("Mistral"):
-        embedding_dimension = 4096
-
-    # projection needed if sizes are different
-    need_proj: bool = attacker_emb_size != embedding_dimension
-
-    ### extra projection
-    if need_proj:
-        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size).to(device)
-
-    ### for attackers
-    ### TODO: make a function to create the model/tokenizer parametrized on model_dir
-    if config['model_dir'] == 'random_gpt2_medium':
-        model_attacker, tokenizer_attacker = init_gpt2()
-    else:
-        model_attacker = AutoModelForCausalLM.from_pretrained(config['model_dir'])
-        tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
-    
-    criterion = SequenceCrossEntropyLoss()
-    model_attacker.to(device)
-    param_optimizer = list(model_attacker.named_parameters())
-    no_decay = ['bias', 'ln', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    ]
-    num_gradients_accumulation = 1
-    num_epochs = config['num_epochs']
-    batch_size = config['batch_size']
-    num_train_optimization_steps  = len(dataloader) * num_epochs // num_gradients_accumulation
-    optimizer = AdamW(optimizer_grouped_parameters, 
-                  lr=3e-5,
-                  eps=1e-06)
-    if need_proj:
-        optimizer.add_param_group({'params': projection.parameters()})
-    scheduler = get_linear_schedule_with_warmup(optimizer, 
-                                            num_warmup_steps=100, 
-                                            num_training_steps = num_train_optimization_steps)
-    
-    ### process to obtain the embeddings
-    for i in range(num_epochs):
-        for idx,batch_text in enumerate(dataloader):
-            with torch.no_grad():           
-                inputs = tokenizer(batch_text, padding=True, truncation=True, return_tensors="pt").to(device)
-                embeddings = model(**inputs, output_hidden_states=True, return_dict=True).pooler_output     
-                print(embeddings.size())
-
-            ### attacker part, needs training
-            if need_proj:
-               embeddings = projection(embeddings)
-
-            record_loss, perplexity = train_on_batch(
-                batch_X=embeddings,
-                batch_D=batch_text,
-                model=model_attacker,
-                tokenizer=tokenizer_attacker,
-                criterion=criterion,
-                device=device,
-                train=True
-            )
-            optimizer.step()
-            scheduler.step()
-            # make sure no grad for GPT optimizer
-            optimizer.zero_grad()
-            print(f'{embed_model_name}: Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}')
-        
-        if need_proj:
-            torch.save(projection.state_dict(), config['projection_save_path'])
-        
-        model_attacker.save_pretrained(config['attacker_save_path'])
-
-
+    exit()
 
 ### used for testing only
 def process_data_test(
@@ -362,29 +298,36 @@ def process_data_test(
         config: dict,
         attacker_emb_size: int
     ):
-    model = SentenceTransformer(config['embed_model_path'], device=device)
+
+    model = AutoModelForCausalLM.from_pretrained(config['embed_model_path'], device_map="auto",)   # dim 768
+    base_model = model.base_model
+    lm_head = model.lm_head
+    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'], padding_side="left")
     
     if(config['decode'] == 'beam'):
         save_path = "logs/" + config['attacker_save_name'] + '_beam.log'
     else:
         save_path = "logs/" + config['attacker_save_name'] + '.log'
     
-    dataset = personachat(data)
+    dataset = the_dataset(data, tokenizer, device, config["max_length"])
     # no shuffle for testing data
     dataloader = DataLoader(dataset=dataset, 
                               shuffle=False, 
                               batch_size=batch_size, 
                               collate_fn=dataset.collate)
-
     print('load data done')
 
     embedding_dimension: int = 768
-    if config['embed_model_path'] == 'all-roberta-large-v1':
-        embedding_dimension = 1024
-    elif config['embed_model_path'] == 'sent_t5_large':
-        embedding_dimension = 1024
-    elif config['embed_model_path'].find('simcse') != -1:
-        embedding_dimension = 1024
+    if config['embed_model_path'].find("Mistral") != -1:
+        embedding_dimension = 4096
+    elif config['embed_model_path'].find("meta") != -1:
+        embedding_dimension = 4096
+
+    print(dataset.max())
+
+    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=dataset.max(), model_type=config["sentence_aggregation"])
+    sentence_embedding_reduction.load_state_dict(torch.load(config["sentence_embedding_reduction_save_path"]))
+    sentence_embedding_reduction.to(device)
 
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
@@ -405,10 +348,22 @@ def process_data_test(
     sent_dict['gt'] = []
     sent_dict['pred'] = []
     with torch.no_grad():  
-        for idx,batch_text in enumerate(dataloader):
+        count=0
+        for idx, (batch_text,batch_tokenized_text) in enumerate(tqdm(dataloader, desc="Processing Batches")):
+            print("batch_text:", batch_text)
+            print("batch_tokenized_text",batch_tokenized_text.keys())
+            print("decoded batch_text:",tokenizer.decode(batch_tokenized_text["input_ids"][0],skip_special_tokens=True))
+            output = base_model(**batch_tokenized_text)
+                
+            hidden_state = output.last_hidden_state
 
-            embeddings = model.encode(batch_text, convert_to_tensor=True).to(device)
-  
+            output = lm_head(hidden_state)
+            print("DECODED:")
+            print(tokenizer.decode(torch.argmax(output[0],-1),skip_special_tokens=True))
+            # Aggregate everything to a single sentence
+            print("hidden_state.shape",hidden_state.shape)
+            embeddings =  sentence_embedding_reduction(hidden_state)
+            print("embeddings.shape",embeddings.shape)
             if need_proj:
                 embeddings = projection(embeddings)
 
@@ -420,92 +375,21 @@ def process_data_test(
                 device=device,
                 config=config
             )    
-            print(f'Testing {idx} batch done with {idx*batch_size} samples')
+            # print(f'Testing {idx} batch done with {idx*batch_size} samples')
             sent_dict['pred'].extend(sent_list)
             sent_dict['gt'].extend(gt_list)
-        
+
+            print("gt_list", gt_list)
+            print("sent_list", sent_list)
+            if count==5:
+                exit()
+            count+=1
+            print("---------")
         with open(save_path, 'w') as f:
             json.dump(sent_dict, f, indent=4)
 
     return 0
         
-
-### used for testing only
-def process_data_test_simcse(
-        data,
-        batch_size: int,
-        device: torch.device,
-        config: dict,
-        attacker_emb_size: int
-    ):
-    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'])
-    model = AutoModel.from_pretrained(config['embed_model_path']).to(device)
-
-    if(config['decode'] == 'beam'):
-        print('Using beam search decoding')
-        save_path = 'logs/' + config['attacker_save_name'] + '_beam.log'
-    else:
-        save_path = 'logs/' + config['attacker_save_name'] +'.log'
-    
-    dataset = personachat(data)
-    # no shuffle for testing data
-    dataloader = DataLoader(dataset=dataset, 
-                              shuffle=False, 
-                              batch_size=batch_size, 
-                              collate_fn=dataset.collate)
-
-    print('load data done')
-    
-    embedding_dimension: int = 768
-    if config['embed_model_path'] == 'all-roberta-large-v1':
-        embedding_dimension = 1024
-    elif config['embed_model_path'] == 'sent_t5_large':
-        embedding_dimension = 1024
-    elif config['embed_model_path'].find('simcse') != -1:
-        embedding_dimension = 1024
-
-    # projection needed if sizes are different
-    need_proj: bool = attacker_emb_size != embedding_dimension
-
-    if need_proj:
-        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size)
-        projection.load_state_dict(torch.load(config['projection_save_path']))
-        projection.to(device)
-        print('load projection done')
-    else:
-        print('no projection loaded')
-    
-    # setup on config for sentence generation AutoModelForCausalLM
-    config['model'] = AutoModelForCausalLM.from_pretrained(config['attacker_save_path']).to(device)
-    config['tokenizer'] = AutoTokenizer.from_pretrained('microsoft/DialoGPT-large')
-
-    sent_dict = {}
-    sent_dict['gt'] = []
-    sent_dict['pred'] = []
-    with torch.no_grad():  
-        for idx,batch_text in enumerate(dataloader):
-            inputs = tokenizer(batch_text, padding=True, truncation=True, return_tensors="pt").to(device)
-            embeddings = model(**inputs, output_hidden_states=True, return_dict=True).pooler_output  
-            
-            if need_proj:
-                embeddings = projection(embeddings)
-
-            sent_list, gt_list = eval_on_batch(
-                batch_X=embeddings,
-                batch_D=batch_text,
-                model=config['model'],
-                tokenizer=config['tokenizer'],
-                device=device,
-                config=config
-            ) 
-            print(f'Testing {idx} batch done with {idx*batch_size} samples')
-            sent_dict['pred'].extend(sent_list)
-            sent_dict['gt'].extend(gt_list)
-        
-        with open(save_path, 'w') as f:
-            json.dump(sent_dict, f,indent=4)
-
-    return 0
 
 
 def train_on_batch(
@@ -567,18 +451,21 @@ def train_on_batch(
 if __name__ == '__main__':
     model_cards = {}
     model_cards['mistralai']='mistralai/Mistral-7B-v0.1'
-    model_cards["gpt_2"]='openai-community/gpt2'
+    model_cards["t5-base"]= 'google-t5/t5-base'
+    model_cards["meta-llama"] = "meta-llama/Meta-Llama-3-8B"
     
     parser = argparse.ArgumentParser(description='Training external decoder to attack an LLM')
     parser.add_argument('--model_dir', type=str, default='microsoft/DialoGPT-large', help='Dir of your model')
     parser.add_argument('--num_epochs', type=int, default=10, help='Training epoches.')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch_size #.')
     parser.add_argument('--dataset', type=str, default='personachat', help='Name of dataset: personachat or qnli')
-    parser.add_argument('--data_type', type=str, default='train', help='train/test')
-    parser.add_argument('--embed_model', type=str, default='gpt_2', help='Name of embedding model: mistralai/...')
+    parser.add_argument('--data_type', type=str, default='test', help='train/test')
+    parser.add_argument('--embed_model', type=str, default='meta-llama', help='Name of embedding model: mistralai/...')
     parser.add_argument('--decode', type=str, default='beam', help='Name of decoding methods: beam/sampling')
-    parser.add_argument('--sentenence_aggregation', type=str, default='mean', help='Name of sentence embending creation methods: mean/convolution/self-attention/encoder')
+    parser.add_argument('--sentence_aggregation', type=str, default='mean', help='Name of sentence embending creation methods: mean/linear/convolution/self-attention/encoder')
     args = parser.parse_args()
+    print("ARGS:")
+    print(args)
     
     config = {}
     config['model_dir'] = args.model_dir
@@ -589,13 +476,13 @@ if __name__ == '__main__':
     config['embed_model'] = args.embed_model
     config['decode'] = args.decode
     config['embed_model_path'] = model_cards[config['embed_model']]
-    config["sentenence_aggregation"] = args.sentenence_aggregation
+    config["sentence_aggregation"] = args.sentence_aggregation
 
     # custom save paths
     attacker_model: str = "rand_gpt2_m" if args.model_dir == "random_gpt2_medium" else "dialogpt2"
-    attacker_save_name: str = f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}"
-    projection_save_name: str = f"projection_{attacker_model}_{config['dataset']}_{config['embed_model']}"
-    sentence_embedding_reduction_save_name: str = f"sentence_embedding_reduction_{attacker_model}_{config['dataset']}_{config['embed_model']}"
+    attacker_save_name: str = f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}"
+    projection_save_name: str = f"projection_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}"
+    sentence_embedding_reduction_save_name: str = f"sentence_embedding_reduction_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}"
     config['attacker_save_path'] = f"models/{attacker_save_name}"
     config['projection_save_path'] = f"models/{projection_save_name}"
     config['sentence_embedding_reduction_save_path'] = f"models/{sentence_embedding_reduction_save_name}"
@@ -614,6 +501,16 @@ if __name__ == '__main__':
     device = config['device']
     batch_size = config['batch_size']
 
+    config_train, config_test = copy.deepcopy(config), copy.deepcopy(config)
+    config_train["data_type"] = "train"
+    config_test["data_type"] = "test" 
+    train_data, test_data = get_sent_list(config_train), get_sent_list(config_test)
+    
+    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'], padding_side="left")
+    
+    the_dataset_train, the_dataset_test = the_dataset(train_data, tokenizer, device), the_dataset(test_data, tokenizer, device) 
+    max_length = max([the_dataset_train.max(), the_dataset_test.max()])
+    config["max_length"] = max_length
     sent_list = get_sent_list(config)
     
     # TODO: figure out when projection is necessary
