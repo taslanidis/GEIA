@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+*.label
 
 # DATA
 data.zip
@@ -13,9 +14,10 @@ data/personachat/personachat_self_original.json
 model_weights
 data_real
 baseline_weights
-blmodels
+blmodels*
 models/
 output/
+logs_*
 
 # Distribution / packaging
 .Python

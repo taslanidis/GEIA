@@ -1,13 +1,13 @@
 #!/bin/bash
 
-DATASET_LIST=('personachat' 'qnli' 'mnli' 'sst2' 'wmt16' 'multi_woz')
-EMBED_MODEL_LIST=('mpnet' 'sent_roberta' 'simcse_bert' 'simcse_roberta' 'sent_t5')
-MODEL_TYPE_LIST=('RNN' 'NN')
+# DATASET_LIST=('personachat' 'qnli' 'mnli' 'sst2' 'wmt16' 'multi_woz')
+# EMBED_MODEL_LIST=('mpnet' 'sent_roberta' 'simcse_bert' 'simcse_roberta' 'sent_t5')
+# MODEL_TYPE_LIST=('RNN' 'NN')
 
-#Default values
-# DATASET_LIST=('wmt16')
-# EMBED_MODEL_LIST=('simcse_bert')
-# MODEL_TYPE_LIST=('NN')
+# Default values
+DATASET_LIST=('personachat' 'qnli')
+EMBED_MODEL_LIST=('mpnet' 'sent_roberta' 'simcse_bert' 'simcse_roberta' 'sent_t5')
+MODEL_TYPE_LIST=('NN' 'RNN')
 
 for DATASET in "${DATASET_LIST[@]}"
 do
