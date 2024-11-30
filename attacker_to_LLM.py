@@ -2,7 +2,7 @@ import os
 from tqdm import tqdm
 import copy
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 import torch
 import torch.nn as nn
@@ -28,6 +28,7 @@ from attacker_evaluation_gpt import eval_on_batch
 from datasets import load_dataset
 from data_process import get_sent_list
 
+# MODEL "B"
 class Sentence_Embedding_model(nn.Module):
     def __init__(self, embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean"):
         super(Sentence_Embedding_model, self).__init__()
@@ -168,14 +169,17 @@ class the_dataset(Dataset):
         tokenized = self.model_tokenizer(unpacked_data,return_tensors="pt", truncation=True, padding='max_length', max_length=self.max_value).to(device=self.device)
         return unpacked_data, tokenized 
 
+
 def process_data(
         data, 
         batch_size: int, 
         device: torch.device, 
+        device2: torch.device, 
         config: dict, 
         attacker_emb_size: int
     ):
 
+    # MODEL A
     # Victim model (model f)
     model = AutoModelForCausalLM.from_pretrained(config['embed_model_path'], device_map="auto",)   # dim 768
     base_model = model.base_model
@@ -194,16 +198,18 @@ def process_data(
     elif config['embed_model_path'].find("meta") != -1:
         embedding_dimension = 4096
 
-    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=dataset.max(), model_type=config["sentence_aggregation"]).to(device)
+    # MODEL B
+    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=dataset.max(), model_type=config["sentence_aggregation"]).to(device2)
     
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
 
     # Extra Projection; aligning model f (victim) with the attacker
     if need_proj:
-        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size).to(device)
+        projection = linear_projection(in_num=embedding_dimension, out_num=attacker_emb_size).to(device2)
     
     # Attacker Model
+
     if config['model_dir'] == 'random_gpt2_medium':
         model_attacker, tokenizer_attacker = init_gpt2()
     else:
@@ -211,7 +217,7 @@ def process_data(
         tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
     
     criterion = SequenceCrossEntropyLoss()
-    model_attacker.to(device)
+    model_attacker.to(device2)
     param_optimizer = list(model_attacker.named_parameters())
     no_decay = ['bias', 'ln', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
@@ -273,7 +279,7 @@ def process_data(
                 model=model_attacker,
                 tokenizer=tokenizer_attacker,
                 criterion=criterion,
-                device=device,
+                device=device2,
                 train=True
             )
             optimizer.step()
@@ -327,7 +333,7 @@ def process_data_test(
 
     sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=dataset.max(), model_type=config["sentence_aggregation"])
     sentence_embedding_reduction.load_state_dict(torch.load(config["sentence_embedding_reduction_save_path"]))
-    sentence_embedding_reduction.to(device)
+    sentence_embedding_reduction.to(device2)
 
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
@@ -490,7 +496,8 @@ if __name__ == '__main__':
     config['projection_save_name'] = projection_save_name
 
     if torch.cuda.is_available():
-        config['device'] = torch.device("cuda")
+        config['device'] = torch.device("cuda:0")
+        config['device2'] = torch.device("cuda:1")
     else:
         raise ImportError("Torch couldn't find CUDA devices. Can't run the attacker on CPU.")
     
@@ -499,6 +506,7 @@ if __name__ == '__main__':
     config['use_opt'] = False
 
     device = config['device']
+    device2 = config['device2']
     batch_size = config['batch_size']
 
     config_train, config_test = copy.deepcopy(config), copy.deepcopy(config)
