@@ -137,7 +137,7 @@ def generate_sentence(config,hidden_X):
     return output
 
 
-def eval(dataloader,config):
+def eval(dataloader, config):
     model = config['model']
     tokenizer = config['tokenizer']
     device = config['device']
@@ -148,7 +148,7 @@ def eval(dataloader,config):
     sent_dict['pred'] = []
 
     with torch.no_grad():
-        for idx,(batch_X,batch_D) in enumerate(dataloader):
+        for idx, (batch_X,batch_D) in enumerate(dataloader):
             batch_D = list(batch_D)
             sent_list, gt_list = eval_on_batch(
                 batch_X,
@@ -209,6 +209,45 @@ def eval_on_batch(
         sent_list.append(sentence)
 
     return sent_list, gt_list
+
+
+def eval_on_batch_fast(
+        batch_X,
+        batch_D,
+        model,
+        tokenizer,
+        device: torch.device,
+        config: dict
+    ):
+    decode_method: str = config['decode']
+
+    if(not config['use_opt']):
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    num_beams: int = 5
+
+    batch_X = batch_X.to(device)
+    print(f'Batch_X: {batch_X.size()}')
+    inputs_embeds = batch_X.unsqueeze(1)
+    attention_mask = torch.ones(inputs_embeds.size()[:-1], device=device)  # Assuming no padding in embeddings
+
+    if decode_method == 'beam':
+        # Generate requires input_ids, so we manually forward with inputs_embeds
+        outputs = model.generate(
+            inputs_embeds=inputs_embeds,  # Pass embeddings directly
+            attention_mask=attention_mask,
+            max_new_tokens=50,
+            num_beams=num_beams,
+            num_return_sequences=1,
+            no_repeat_ngram_size=2,
+            pad_token_id=tokenizer.eos_token_id,
+            early_stopping=True
+        )
+        decoded = [tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+    else:
+        decoded = [generate_sentence(config, hidden_X=inputs_embeds) for inputs_embeds in batch_X]
+
+    return decoded, batch_D
 
 
 def main():
