@@ -17,7 +17,8 @@ baseline_weights
 blmodels*
 models/
 output/
-logs_*
+logs*
+.vscode/
 
 # Distribution / packaging
 .Python
