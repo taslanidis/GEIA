@@ -12,7 +12,6 @@ list of supported datasets:
 ['personachat'.'qnli','mnli','sst2','wmt16','multi_woz','abcd']
 '''
 
-
 def get_sent_list(config):
     dataset = config['dataset']
     data_type = config['data_type']
