@@ -1,8 +1,11 @@
 import os
 from tqdm import tqdm
 import copy
+import transformers
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+
+import wandb
 
 import torch
 import torch.nn as nn
@@ -28,7 +31,7 @@ from attacker_evaluation_gpt import eval_on_batch
 from datasets import load_dataset
 from data_process import get_sent_list
 
-# MODEL "B"
+# Sentence Model
 class Sentence_Embedding_model(nn.Module):
     def __init__(self, embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean"):
         super(Sentence_Embedding_model, self).__init__()
@@ -122,7 +125,6 @@ class linear_projection(nn.Module):
     def forward(self, x, use_final_hidden_only = True):
         # x should be of shape (?,in_num) according to gpt2 output
         out_shape = x.size()[-1]
-        print(x.size())
         assert(x.size()[1] == out_shape)
         out = self.fc1(x)
         return out
@@ -144,53 +146,38 @@ def init_opt():
 
 class the_dataset(Dataset):
     
-    def __init__(self, data, model_tokenizer, device, max_value=None):
+    def __init__(self, data, model_tokenizer):
         self.data = data
         self.model_tokenizer = model_tokenizer 
         self.model_tokenizer.pad_token = self.model_tokenizer.eos_token
-        self.device = device
-        if max_value is None:
-            self.max_value = max([len(i.split(" ")) for i in self.data])+2
-        else:
-            self.max_value = max_value
 
     def __len__(self):
         return len(self.data)
 
-    def max(self):
-        return self.max_value
-    
     def __getitem__(self, index):
         text = self.data[index]
         return  text
         
     def collate(self, unpacked_data):
         # truncation=True is needed but does nothing!
-        tokenized = self.model_tokenizer(unpacked_data,return_tensors="pt", truncation=True, padding='max_length', max_length=self.max_value).to(device=self.device)
-        return unpacked_data, tokenized 
+        return unpacked_data, self.model_tokenizer(unpacked_data,return_tensors="pt", padding=True) 
 
 
 def process_data(
         data, 
         batch_size: int, 
-        device: torch.device, 
+        device1: torch.device, 
         device2: torch.device, 
         config: dict, 
         attacker_emb_size: int
     ):
-
-    # MODEL A
-    # Victim model (model f)
-    model = AutoModelForCausalLM.from_pretrained(config['embed_model_path'], device_map="auto",)   # dim 768
-    base_model = model.base_model
-    lm_head = model.lm_head
-    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'], padding_side="left")
-    dataset = the_dataset(data, tokenizer, device, config["max_length"])
+    model = AutoModelForCausalLM.from_pretrained(config['embed_model_path'], device_map=device1)   # dim 768
+    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'], padding_side='left')
+    dataset = the_dataset(data, tokenizer)
     dataloader = DataLoader(dataset=dataset, 
                               shuffle=True, 
                               batch_size=batch_size, 
                               collate_fn=dataset.collate)
-    print('Load data done')
 
     embedding_dimension: int = 768
     if config['embed_model_path'].find("Mistral") != -1:
@@ -198,8 +185,8 @@ def process_data(
     elif config['embed_model_path'].find("meta") != -1:
         embedding_dimension = 4096
 
-    # MODEL B
-    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=dataset.max(), model_type=config["sentence_aggregation"]).to(device2)
+    # Sentence model - In the attacker schema
+    sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=config["max_new_tokens"]-1, model_type=config["sentence_aggregation"]).to(device2)
     
     # projection needed if sizes are different
     need_proj: bool = attacker_emb_size != embedding_dimension
@@ -244,29 +231,27 @@ def process_data(
     # 3. Train the attacker, by:
     #     3.a Taking the sentence embedding and generating text
     #     3.b Calculate the loss compared of the generated text, and the GT text
-    count=0
+    print_first_decode = True
+    count = 0 
     for i in range(num_epochs):
-        base_model.eval()
-        lm_head.eval()
+        model.eval()
         for idx, (batch_text,batch_tokenized_text) in enumerate(tqdm(dataloader, desc="Processing Batches")):
             with torch.no_grad():       
-                output = base_model(**batch_tokenized_text)
-                
-                hidden_state = output.last_hidden_state
+                batch_tokenized_text = batch_tokenized_text.to(device1)
+                outputs=model.generate(**batch_tokenized_text, do_sample=True, max_new_tokens=config["max_new_tokens"], top_k=50, output_hidden_states=True, return_dict_in_generate = True, pad_token_id=tokenizer.eos_token_id)
 
+                # get all the tokens expect the tokens that are the input text (i.e. the first token)
+                last_hidden_state = torch.cat([ i[-1] for i in outputs["hidden_states"]][1:], dim =1)
+
+                if print_first_decode:
+                    print("Example of LLM inference:")
+                    print("output:",tokenizer.decode(outputs["sequences"][0][:batch_tokenized_text.input_ids.shape[1]])," --- ",tokenizer.decode(outputs["sequences"][0][batch_tokenized_text.input_ids.shape[1]:],skip_special_tokens=True))
+                    print("last_hidden_state shape",last_hidden_state.shape)
+                    print_first_decode=False
+                
             # Aggregate everything to a single sentence
-            embeddings =  sentence_embedding_reduction(hidden_state)  
-
-            # print("batch_text:", batch_text)
-            # print("batch_tokenized_text",batch_tokenized_text.keys())
-            # print("decoded batch_text:",tokenizer.decode(batch_tokenized_text["input_ids"][0],skip_special_tokens=True))
-            output = base_model(**batch_tokenized_text)
-                
-            hidden_state = output.last_hidden_state
-
-            # output = lm_head(hidden_state)
-            # print("DECODED:")
-            # print(tokenizer.decode(torch.argmax(output[0],-1),skip_special_tokens=True))
+            last_hidden_state = last_hidden_state.to(device2)
+            embeddings =  sentence_embedding_reduction(last_hidden_state)  
 
             # attacker part, needs training
             if need_proj:
@@ -286,6 +271,7 @@ def process_data(
             # make sure no grad for GPT optimizer
             optimizer.zero_grad()
             print(f'Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}')
+            wandb.log({"record_loss": record_loss, "perplexity": perplexity})
             if count ==1417:
                 break
             count+=1
@@ -314,7 +300,7 @@ def process_data_test(
     else:
         save_path = "logs/" + config['attacker_save_name'] + '.log'
     
-    dataset = the_dataset(data, tokenizer, device, config["max_length"])
+    dataset = the_dataset(data, tokenizer, device)
     # no shuffle for testing data
     dataloader = DataLoader(dataset=dataset, 
                               shuffle=False, 
@@ -328,7 +314,6 @@ def process_data_test(
     elif config['embed_model_path'].find("meta") != -1:
         embedding_dimension = 4096
 
-    print(dataset.max())
 
     sentence_embedding_reduction = Sentence_Embedding_model(embedding_dim=embedding_dimension, sequence_length=dataset.max(), model_type=config["sentence_aggregation"])
     sentence_embedding_reduction.load_state_dict(torch.load(config["sentence_embedding_reduction_save_path"]))
@@ -462,6 +447,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Training external decoder to attack an LLM')
     parser.add_argument('--model_dir', type=str, default='microsoft/DialoGPT-large', help='Dir of your model')
     parser.add_argument('--num_epochs', type=int, default=10, help='Training epoches.')
+    parser.add_argument('--max_new_tokens', type=int, default=60, help='How many tokens should the LLM use to answer the prompt?')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch_size #.')
     parser.add_argument('--dataset', type=str, default='personachat', help='Name of dataset: personachat or qnli')
     parser.add_argument('--data_type', type=str, default='test', help='train/test')
@@ -482,6 +468,7 @@ if __name__ == '__main__':
     config['decode'] = args.decode
     config['embed_model_path'] = model_cards[config['embed_model']]
     config["sentence_aggregation"] = args.sentence_aggregation
+    config["max_new_tokens"] = args.max_new_tokens
 
     # custom save paths
     attacker_model: str = "rand_gpt2_m" if args.model_dir == "random_gpt2_medium" else "dialogpt2"
@@ -495,8 +482,14 @@ if __name__ == '__main__':
     config['projection_save_name'] = projection_save_name
 
     if torch.cuda.is_available():
-        config['device'] = torch.device("cuda:2")
-        config['device2'] = torch.device("cuda:3")
+        config['device1'] = torch.device("cuda:0")
+        if torch.cuda.device_count()>1:
+            config['device2'] = torch.device("cuda:1")
+        else:
+            print("Only 1 cuda device was found!")
+            config['device2'] = torch.device("cuda:0")
+        print("device 1 :",config["device1"])
+        print("device 2 :",config["device2"])
     else:
         raise ImportError("Torch couldn't find CUDA devices. Can't run the attacker on CPU.")
     
@@ -504,20 +497,12 @@ if __name__ == '__main__':
     config['eos_token'] = config['tokenizer'].eos_token
     config['use_opt'] = False
 
-    device = config['device']
+    device1 = config['device1']
     device2 = config['device2']
     batch_size = config['batch_size']
 
-    config_train, config_test = copy.deepcopy(config), copy.deepcopy(config)
-    config_train["data_type"] = "train"
-    config_test["data_type"] = "test" 
-    train_data, test_data = get_sent_list(config_train), get_sent_list(config_test)
-    
-    tokenizer = AutoTokenizer.from_pretrained(config['embed_model_path'], padding_side="left")
-    
-    the_dataset_train, the_dataset_test = the_dataset(train_data, tokenizer, device), the_dataset(test_data, tokenizer, device) 
-    max_length = max([the_dataset_train.max(), the_dataset_test.max()])
-    config["max_length"] = max_length
+    wandb.init(project="GEIA", name= "attack_to_LLM", config = config)
+
     sent_list = get_sent_list(config)
     
     # TODO: figure out when projection is necessary
@@ -531,14 +516,15 @@ if __name__ == '__main__':
     if(config['data_type'] == 'train'):
         # -- Training --
         if('simcse' in config['embed_model']):
-            process_data_simcse(sent_list,batch_size,device,device2,config,attacker_emb_size)
+            process_data_simcse(sent_list,batch_size,device1,device2,config,attacker_emb_size)
         else:
-            process_data(sent_list,batch_size,device,device2,config,attacker_emb_size)
+            process_data(sent_list,batch_size,device1,device2,config,attacker_emb_size)
 
     elif(config['data_type'] == 'test'):
         # -- Inference --
         if('simcse' in config['embed_model']):
-            process_data_test_simcse(sent_list,batch_size,device,device2,config,attacker_emb_size=attacker_emb_size)
+            process_data_test_simcse(sent_list,batch_size,device1,device2,config,attacker_emb_size=attacker_emb_size)
         else:
-            process_data_test(sent_list,batch_size,device,device2,config,attacker_emb_size=attacker_emb_size)
+            process_data_test(sent_list,batch_size,device1,device2,config,attacker_emb_size=attacker_emb_size)
 
+    wandb.finish()
