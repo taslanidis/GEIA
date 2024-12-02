@@ -25,7 +25,7 @@ from transformers import (
 )
 from torch.utils.data import Dataset, DataLoader
 from attacker_models import SequenceCrossEntropyLoss
-from attacker_evaluation_gpt import eval_on_batch
+from attacker_evaluation_gpt import eval_on_batch_fast
 from data_process import get_sent_list
 from sentence_representation_model import Sentence_Embedding_model
 
@@ -225,14 +225,14 @@ def process_data_test(dataset:LLM_dataset, config: dict):
             if need_proj:
                 embeddings = projection(embeddings)
 
-            sent_list, gt_list = eval_on_batch(
+            sent_list, gt_list = eval_on_batch_fast(
                 batch_X=embeddings,
                 batch_D=batch_text,
-                model=config["model"],
-                tokenizer=config["tokenizer"],
+                model=config['model'],
+                tokenizer=config['tokenizer'],
                 device=config["device"],
-                config=config,
-            )
+                config=config
+            ) 
             
             # print(f'Testing {idx} batch done with {idx*batch_size} samples')
             sent_dict["pred"].extend(sent_list)
@@ -420,29 +420,28 @@ if __name__ == "__main__":
     device2 = config["device2"]
     batch_size = config["batch_size"]
 
-    wandb.init(project="GEIA", name="attack_to_LLM", config=config)
-
     sent_list = get_sent_list(config)
     the_original_dataset: Dataset = original_dataset(sent_list)
     the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
-
-    # TODO: figure out when projection is necessary
-    config["attacker_emb_size"]: int = 768
-    if config["model_dir"].find("medium") != -1:
-        config["attacker_emb_size"] = 1024
-    elif config["model_dir"].find("large") != -1:
-        config["attacker_emb_size"] = 1280
 
     config["victim_emb_size"]: int = 768
     if config["embed_model_path"].find("Mistral") != -1:
         config["victim_emb_size"] = 4096
     elif config["embed_model_path"].find("meta") != -1:
         config["victim_emb_size"] = 4096
+        
+    config["attacker_emb_size"]: int = 768
+    if config["model_dir"].find("medium") != -1:
+        config["attacker_emb_size"] = 1024
+    elif config["model_dir"].find("large") != -1:
+        config["attacker_emb_size"] = 1280
+
+    wandb.init(project="GEIA", name="attack_to_LLM", config=config)
 
     if config["data_type"] == "train":
         # -- Training --
         process_data(the_LLM_dataset, batch_size, config)
-
+        
     elif config["data_type"] == "test":
         # -- Inference --
         process_data_test(the_LLM_dataset, batch_size, config)
