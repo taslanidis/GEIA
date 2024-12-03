@@ -334,7 +334,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_new_tokens",
         type=int,
-        default=100,
+        default=20,
         help="How many tokens should the LLM use to answer the prompt?",
     )
     parser.add_argument("--batch_size", type=int, default=16, help="Batch_size #.")
@@ -433,13 +433,14 @@ if __name__ == "__main__":
     print("Configuration:")
     print(config)
 
+    wandb.init(project="GEIA", name="attack_to_LLM", config=config)
+
     sent_list = get_sent_list(config)
     the_original_dataset: Dataset = original_dataset(sent_list)
-    # reduce the original_dataset to just 200 samples to check the code
-    # the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(200))
+    # reduce the original_dataset to just 20% samples to check the code
+    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(len(the_original_dataset)*0.20))
     the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
 
-    wandb.init(project="GEIA", name="attack_to_LLM", config=config)
 
     if config["data_type"] == "train":
         # -- Training --
