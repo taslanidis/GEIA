@@ -436,15 +436,15 @@ if __name__ == "__main__":
     sent_list = get_sent_list(config)
     the_original_dataset: Dataset = original_dataset(sent_list)
     # reduce the original_dataset to just 20% samples to check the code
-    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(len(the_original_dataset)*0.20))
+    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(int(len(the_original_dataset)*0.20)))
     the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
 
-    if config["data_type"] == "train":
-        # -- Training --
-        process_data(the_LLM_dataset, config)
+    # if config["data_type"] == "train":
+    #     # -- Training --
+    #     process_data(the_LLM_dataset, config)
 
-    elif config["data_type"] == "test":
-        # -- Inference --
-        process_data_test(the_LLM_dataset, config)
+    # elif config["data_type"] == "test":
+    #     # -- Inference --
+    #     process_data_test(the_LLM_dataset, config)
 
     wandb.finish()
