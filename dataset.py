@@ -143,7 +143,10 @@ class LLM_dataset(Dataset):
             json.dump(
                 output_text, open(self.save_embedding_path / "output_text.json", "w")
             )
-            exit()
+
+        del model, tokenizer
+        torch.cuda.empty_cache()
+        
     def collate(self, batch):
         hidden_states = []
         for text in batch:

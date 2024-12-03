@@ -438,7 +438,8 @@ if __name__ == "__main__":
     sent_list = get_sent_list(config)
     the_original_dataset: Dataset = original_dataset(sent_list)
     # reduce the original_dataset to just 20% samples to check the code
-    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(len(the_original_dataset)*0.20))
+    print("len(the_original_dataset)*0.01",len(the_original_dataset)*0.01)
+    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(np.floor(len(the_original_dataset)*0.01).astype(int)))
     the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
 
 
