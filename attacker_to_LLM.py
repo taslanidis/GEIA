@@ -390,9 +390,7 @@ if __name__ == "__main__":
 
     config[
         "save_embedding"
-    ]: (
-        str
-    ) = f"{args.save_embedding}/saved_embeddings_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
+    ]: str = f"{args.save_embedding}/saved_embeddings_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}_{config['data_type']}"
 
     attacker_save_name: str = (
         f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
@@ -438,17 +436,20 @@ if __name__ == "__main__":
     sent_list = get_sent_list(config)
     the_original_dataset: Dataset = original_dataset(sent_list)
     # reduce the original_dataset to just 20% samples to check the code
+<<<<<<< HEAD
     print("len(the_original_dataset)*0.01",len(the_original_dataset)*0.01)
     the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(np.floor(len(the_original_dataset)*0.01).astype(int)))
+=======
+    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(int(len(the_original_dataset)*0.20)))
+>>>>>>> refs/remotes/origin/LLM-addition
     the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
 
+    # if config["data_type"] == "train":
+    #     # -- Training --
+    #     process_data(the_LLM_dataset, config)
 
-    if config["data_type"] == "train":
-        # -- Training --
-        process_data(the_LLM_dataset, config)
-
-    elif config["data_type"] == "test":
-        # -- Inference --
-        process_data_test(the_LLM_dataset, config)
+    # elif config["data_type"] == "test":
+    #     # -- Inference --
+    #     process_data_test(the_LLM_dataset, config)
 
     wandb.finish()
