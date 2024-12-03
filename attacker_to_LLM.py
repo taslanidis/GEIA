@@ -52,12 +52,14 @@ def init_gpt2():
 
 
 def process_data(
-    data,
     dataset: LLM_dataset,
     config: dict,
 ):
     dataloader = DataLoader(
-        dataset=dataset, shuffle=True, batch_size=config["batch_size"], collate_fn=dataset.collate
+        dataset=dataset,
+        shuffle=True,
+        batch_size=config["batch_size"],
+        collate_fn=dataset.collate,
     )
 
     # Sentence model - In the attacker schema
@@ -129,7 +131,7 @@ def process_data(
         ):
             last_hidden_state = last_hidden_state.to(config["device"])
             embeddings = sentence_embedding_model(last_hidden_state)
-            
+
             # attacker part, needs training
             if need_proj:
                 embeddings = projection(embeddings)
@@ -140,21 +142,21 @@ def process_data(
                 model=model_attacker,
                 tokenizer=tokenizer_attacker,
                 criterion=criterion,
-                device=device2,
+                device=config["device"],
                 train=True,
             )
-            
+
             optimizer.step()
             scheduler.step()
             # make sure no grad for GPT optimizer
             optimizer.zero_grad()
-            
+
             # print(
             #     f"Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}"
             # )
-            
+
             wandb.log({"record_loss": record_loss, "perplexity": perplexity})
-            
+
         if need_proj:
             torch.save(projection.state_dict(), config["projection_save_path"])
         torch.save(
@@ -165,7 +167,7 @@ def process_data(
 
 
 ### used for testing only
-def process_data_test(dataset:LLM_dataset, config: dict):
+def process_data_test(dataset: LLM_dataset, config: dict):
 
     if config["decode"] == "beam":
         save_path = "logs/" + config["attacker_save_name"] + "_beam.log"
@@ -176,16 +178,16 @@ def process_data_test(dataset:LLM_dataset, config: dict):
     dataloader = DataLoader(
         dataset=dataset,
         shuffle=False,
-        batch_size=batch_size,
+        batch_size=config["batch_size"],
         collate_fn=dataset.collate,
     )
     print("load data done")
 
     sentence_embedding_model = Sentence_Embedding_model(
         embedding_dim=config["victim_emb_size"],
-        sequence_length=dataset.max(),
+        sequence_length=config["max_new_tokens"] - 1,
         model_type=config["sentence_aggregation"],
-    )
+    ).to(config["device"])
     sentence_embedding_model.load_state_dict(
         torch.load(config["sentence_embedding_model_save_path"])
     )
@@ -219,7 +221,7 @@ def process_data_test(dataset:LLM_dataset, config: dict):
             tqdm(dataloader, desc="Processing Batches")
         ):
             last_hidden_states = last_hidden_states.to(config["device"])
-            
+
             embeddings = sentence_embedding_model(last_hidden_states)
 
             if need_proj:
@@ -228,12 +230,12 @@ def process_data_test(dataset:LLM_dataset, config: dict):
             sent_list, gt_list = eval_on_batch_fast(
                 batch_X=embeddings,
                 batch_D=batch_text,
-                model=config['model'],
-                tokenizer=config['tokenizer'],
+                model=config["model"],
+                tokenizer=config["tokenizer"],
                 device=config["device"],
-                config=config
-            ) 
-            
+                config=config,
+            )
+
             # print(f'Testing {idx} batch done with {idx*batch_size} samples')
             sent_dict["pred"].extend(sent_list)
             sent_dict["gt"].extend(gt_list)
@@ -332,7 +334,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_new_tokens",
         type=int,
-        default=60,
+        default=100,
         help="How many tokens should the LLM use to answer the prompt?",
     )
     parser.add_argument("--batch_size", type=int, default=16, help="Batch_size #.")
@@ -361,9 +363,13 @@ if __name__ == "__main__":
         default="mean",
         help="Name of sentence embending creation methods: mean/linear/convolution/self-attention/encoder",
     )
+    parser.add_argument(
+        "--save_embedding",
+        type=str,
+        default="./LLM_hidden_states/",
+        help="The path to save the LLM last hidden states",
+    )
     args = parser.parse_args()
-    print("ARGS:")
-    print(args)
 
     config = {}
     config["model_dir"] = args.model_dir
@@ -381,14 +387,21 @@ if __name__ == "__main__":
     attacker_model: str = (
         "rand_gpt2_m" if args.model_dir == "random_gpt2_medium" else "dialogpt2"
     )
+
+    config[
+        "save_embedding"
+    ]: (
+        str
+    ) = f"{args.save_embedding}/saved_embeddings_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
+
     attacker_save_name: str = (
-        f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}"
+        f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
     )
     projection_save_name: str = (
-        f"projection_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}"
+        f"projection_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
     )
     sentence_embedding_model_save_name: str = (
-        f"sentence_embedding_model_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}"
+        f"sentence_embedding_model_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
     )
     config["attacker_save_path"] = f"models/{attacker_save_name}"
     config["projection_save_path"] = f"models/{projection_save_name}"
@@ -399,51 +412,41 @@ if __name__ == "__main__":
     config["projection_save_name"] = projection_save_name
 
     if torch.cuda.is_available():
-        config["device1"] = torch.device("cuda:0")
-        if torch.cuda.device_count() > 1:
-            config["device2"] = torch.device("cuda:1")
-        else:
-            print("Only 1 cuda device was found!")
-            config["device2"] = torch.device("cuda:0")
-        print("device 1 :", config["device1"])
-        print("device 2 :", config["device2"])
+        config["device"] = torch.device("cuda:0")
     else:
         raise ImportError(
             "Torch couldn't find CUDA devices. Can't run the attacker on CPU."
         )
-
-    config["tokenizer"] = AutoTokenizer.from_pretrained("microsoft/DialoGPT-large")
-    config["eos_token"] = config["tokenizer"].eos_token
-    config["use_opt"] = False
-
-    device1 = config["device1"]
-    device2 = config["device2"]
-    batch_size = config["batch_size"]
-
-    sent_list = get_sent_list(config)
-    the_original_dataset: Dataset = original_dataset(sent_list)
-    the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
 
     config["victim_emb_size"]: int = 768
     if config["embed_model_path"].find("Mistral") != -1:
         config["victim_emb_size"] = 4096
     elif config["embed_model_path"].find("meta") != -1:
         config["victim_emb_size"] = 4096
-        
+
     config["attacker_emb_size"]: int = 768
     if config["model_dir"].find("medium") != -1:
         config["attacker_emb_size"] = 1024
     elif config["model_dir"].find("large") != -1:
         config["attacker_emb_size"] = 1280
 
+    print("Configuration:")
+    print(config)
+
+    sent_list = get_sent_list(config)
+    the_original_dataset: Dataset = original_dataset(sent_list)
+    # reduce the original_dataset to just 200 samples to check the code
+    # the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(200))
+    the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
+
     wandb.init(project="GEIA", name="attack_to_LLM", config=config)
 
     if config["data_type"] == "train":
         # -- Training --
-        process_data(the_LLM_dataset, batch_size, config)
-        
+        process_data(the_LLM_dataset, config)
+
     elif config["data_type"] == "test":
         # -- Inference --
-        process_data_test(the_LLM_dataset, batch_size, config)
+        process_data_test(the_LLM_dataset, config)
 
     wandb.finish()

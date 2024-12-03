@@ -10,6 +10,7 @@ __pycache__/
 # DATA
 data.zip
 data/abcd/
+LLM_hidden_states
 data/personachat/personachat_self_original.json
 model_weights
 data_real
