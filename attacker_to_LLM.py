@@ -390,9 +390,7 @@ if __name__ == "__main__":
 
     config[
         "save_embedding"
-    ]: (
-        str
-    ) = f"{args.save_embedding}/saved_embeddings_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
+    ]: str = f"{args.save_embedding}/saved_embeddings_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}_{config['data_type']}"
 
     attacker_save_name: str = (
         f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
@@ -440,7 +438,6 @@ if __name__ == "__main__":
     # reduce the original_dataset to just 20% samples to check the code
     the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(len(the_original_dataset)*0.20))
     the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
-
 
     if config["data_type"] == "train":
         # -- Training --

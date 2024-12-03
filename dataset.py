@@ -122,12 +122,18 @@ class LLM_dataset(Dataset):
                     futures =[executor.submit(save_hidden_states, last_hidden_state, mapping_id[text])
                             for text, last_hidden_state in zip(batch, batch_last_hidden_state)]
 
+                    sequences_to_decode = [
+                        sequence[tokenized_batch.input_ids.shape[1]:] for sequence in output["sequences"]
+                    ]
+
+
                     # Save the outputs until the last hidden state is saved
-                    for text, sequence in zip(batch, output["sequences"]):
-                        output_text[text] = tokenizer.decode(
-                            sequence[tokenized_batch.input_ids.shape[1] :],
-                            skip_special_tokens=True,
-                        )
+                    output_text.update(
+                        {
+                            text: tokenizer.decode(sequence, skip_special_tokens=True)
+                            for text, sequence in zip(batch, sequences_to_decode)
+                        }
+                    )
                         
                     # wait for all tasks to complete
                     [future.result() for future in futures]
@@ -143,7 +149,7 @@ class LLM_dataset(Dataset):
             json.dump(
                 output_text, open(self.save_embedding_path / "output_text.json", "w")
             )
-            exit()
+
     def collate(self, batch):
         hidden_states = []
         for text in batch:
