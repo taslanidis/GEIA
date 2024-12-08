@@ -10,6 +10,7 @@ __pycache__/
 # DATA
 data.zip
 data/abcd/
+LLM_hidden_states
 data/personachat/personachat_self_original.json
 model_weights
 data_real
@@ -17,7 +18,10 @@ baseline_weights
 blmodels*
 models/
 output/
-logs_*
+logs*
+.vscode/
+
+wandb
 
 # Distribution / packaging
 .Python
@@ -137,6 +141,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.env_extension
 env/
 venv/
 ENV/

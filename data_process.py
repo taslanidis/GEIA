@@ -12,10 +12,9 @@ list of supported datasets:
 ['personachat'.'qnli','mnli','sst2','wmt16','multi_woz','abcd']
 '''
 
-
 def get_sent_list(config):
     dataset = config['dataset']
-    data_type = config['data_type']
+    data_type = config.get('data_type')
     if dataset == 'personachat':
         sent_list = get_personachat_data(data_type)
         return sent_list
@@ -36,6 +35,9 @@ def get_sent_list(config):
         return sent_list
     elif dataset == 'abcd':#abcd
         sent_list = get_abcd_data(data_type)
+        return sent_list
+    elif dataset == 'snli':
+        sent_list = ... # TODO
         return sent_list
     else:
         print('Name of dataset only supports: personachat or qnli')
