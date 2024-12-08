@@ -41,7 +41,7 @@ class BeamSearchNode(object):
 
 
 
-def beam_decode_sentence(hidden_X, config,num_generate=1, beam_size = 5, batch_size = 1):
+def beam_decode_sentence(hidden_X, config, num_generate: int = 1, beam_size: int = 5, batch_size: int = 1):
     '''
     generate a sentence based on beam search
     :param hidden_X: hidden_X of sentence embedding  (1024) with/without projection

@@ -17,7 +17,8 @@ baseline_weights
 blmodels*
 models/
 output/
-logs_*
+logs*
+.vscode/
 
 # Distribution / packaging
 .Python
@@ -137,6 +138,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.env_extension
 env/
 venv/
 ENV/
