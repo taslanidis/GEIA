@@ -55,32 +55,6 @@ class personachat(Dataset):
     def collate(self, unpacked_data):
         return unpacked_data
 
-def train_on_batch(batch_D,model,tokenizer,criterion,device,train=True):
-    padding_token_id = tokenizer.encode(tokenizer.eos_token)[0]
-    tokenizer.pad_token = tokenizer.eos_token
-    inputs = tokenizer(batch_D, return_tensors='pt', padding='max_length', truncation=True, max_length=40)
-
-    input_ids = inputs['input_ids'].to(device) # tensors of input ids
-    labels = input_ids.clone()
-
-    past = None
-
-    logits, past = model(input_ids,past_key_values  = past,return_dict=False)
-    logits = logits[:, :-1].contiguous()
-    target = labels[:, 1:].contiguous()
-
-    target_mask = torch.ones_like(target).float()
-
-    loss = criterion(logits, target, target_mask, label_smoothing=0.02, reduce="batch")   
-
-    record_loss = loss.item()
-    perplexity = np.exp(record_loss)
-    if train:
-        loss.backward()
-
-    return record_loss, perplexity
-
-
 def process_data(data,batch_size,device,config,need_porj=False):
     dataset = personachat(data)
     dataloader = DataLoader(dataset=dataset, 
@@ -94,7 +68,7 @@ def process_data(data,batch_size,device,config,need_porj=False):
     if need_porj:
         projection = linear_projection(in_num=768).to(device)
     ### for attackers
-    model_attacker = AutoModelForCausalLM.from_pretrained('dialogpt_qnli')
+    model_attacker = AutoModelForCausalLM.from_pretrained('microsoft/DialoGPT-medium') # dialogpt_qnli')
     tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
     criterion = SequenceCrossEntropyLoss()
     model_attacker.to(device)
@@ -130,6 +104,34 @@ def process_data(data,batch_size,device,config,need_porj=False):
 
         print(f'Validate ppl: {np.mean(running_ppl)}')
 
+
+
+def train_on_batch(batch_D,model,tokenizer,criterion,device,train=True):
+    padding_token_id = tokenizer.encode(tokenizer.eos_token)[0]
+    tokenizer.pad_token = tokenizer.eos_token
+    inputs = tokenizer(batch_D, return_tensors='pt', padding='max_length', truncation=True, max_length=40)
+
+    input_ids = inputs['input_ids'].to(device) # tensors of input ids
+    labels = input_ids.clone()
+
+    past = None
+
+    logits, past = model(input_ids,past_key_values  = past,return_dict=False)
+    logits = logits[:, :-1].contiguous()
+    target = labels[:, 1:].contiguous()
+
+    target_mask = torch.ones_like(target).float()
+
+    loss = criterion(logits, target, target_mask, label_smoothing=0.02, reduce="batch")   
+
+    record_loss = loss.item()
+    perplexity = np.exp(record_loss)
+    if train:
+        loss.backward()
+
+    return record_loss, perplexity
+
+
 def read_logs(path):
     with open(path) as f:
         data = json.load(f)
@@ -140,32 +142,30 @@ def get_val_ppl(path,batch_size,device,config):
     sent_list = read_logs(path)
     process_data(sent_list,batch_size,device,config)
 
-# def get_qnli_data(data_type):
-#     dataset = load_dataset('glue','qnli', cache_dir="/home/hlibt/embed_rev/data", split=data_type)
-#     sentence_list = []
-#     for i,d in enumerate(dataset):
-#         sentence_list.append(d['question'])
-#         sentence_list.append(d['sentence'])
-#     return sentence_list
+def get_qnli_data(data_type):
+    dataset = load_dataset('glue','qnli', cache_dir="/home/hlibt/embed_rev/data", split=data_type)
+    sentence_list = []
+    for i,d in enumerate(dataset):
+        sentence_list.append(d['question'])
+        sentence_list.append(d['sentence'])
+    return sentence_list
+def get_personachat_data(data_type):
 
-# def get_personachat_data(data_type):
-#     sent_list = get_persona_dict(data_type=data_type)
-#     return sent_list
+    sent_list = get_persona_dict(data_type=data_type)
+    return sent_list
 
-# def get_sent_list(config):
-#     dataset = config['dataset']
-#     data_type = config['data_type']
-#     if dataset == 'personachat':
-#         sent_list = get_personachat_data(data_type)
-#         return sent_list
-#     elif dataset == 'qnli':
-#         sent_list = get_qnli_data(data_type)
-#         return sent_list
-#     else:
-#         print('Name of dataset only supports: personachat or qnli')
-#         sys.exit(-1)
-        
-        
+def get_sent_list(config):
+    dataset = config['dataset']
+    data_type = config['data_type']
+    if dataset == 'personachat':
+        sent_list = get_personachat_data(data_type)
+        return sent_list
+    elif dataset == 'qnli':
+        sent_list = get_qnli_data(data_type)
+        return sent_list
+    else:
+        print('Name of dataset only supports: personachat or qnli')
+        sys.exit(-1)
 if __name__ == '__main__':
     model_cards ={}
     model_cards['sent_t5'] = 'sentence-t5-large'
@@ -204,29 +204,40 @@ if __name__ == '__main__':
 
     batch_size = config['batch_size']
 
-
-    
+    # Original Paper
     ### qnli with beam search decoding
-    sbert_roberta_large_pc_path  =  '../models_random/attacker_gpt2_qnli_sent_roberta.log'
-    simcse_roberta_large_pc_path  = '../models_random/attacker_gpt2_qnli_simcse_roberta.log'
-    simcse_bert_large_pc_path = '../models_random/attacker_gpt2_qnli_simcse_bert.log' 
-    sentence_T5_large_pc_path = '../models_random/attacker_gpt2_qnli_sent_t5.log' 
-    mpnet_pc_path = '../models_random/attacker_gpt2_qnli_mpnet.log'
+    # sbert_roberta_large_pc_path  =  '../models_random/attacker_gpt2_qnli_sent_roberta.log'
+    # simcse_roberta_large_pc_path  = '../models_random/attacker_gpt2_qnli_simcse_roberta.log'
+    # simcse_bert_large_pc_path = '../models_random/attacker_gpt2_qnli_simcse_bert.log' 
+    # sentence_T5_large_pc_path = '../models_random/attacker_gpt2_qnli_sent_t5.log' 
+    # mpnet_pc_path = '../models_random/attacker_gpt2_qnli_mpnet.log'
     
+    # print('===mpnet===')
+    # get_val_ppl(mpnet_pc_path,batch_size,device,config)
+    # print('===sen_roberta===')
+    # get_val_ppl(sbert_roberta_large_pc_path,batch_size,device,config)
+    # print('===st5===')
+    # get_val_ppl(sentence_T5_large_pc_path,batch_size,device,config)
+    # print('===simcse_bert===')
+    # get_val_ppl(simcse_bert_large_pc_path,batch_size,device,config)
+    # print('===simcse_roberta===')
+    # get_val_ppl(simcse_roberta_large_pc_path,batch_size,device,config)
+
+    # Our run    
     first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
     second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    third = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log"
+    # "logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    forth =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log"
+    fith = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log"
+    # "logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    six = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log"
+    seven =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log"
+    eight =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log"
+    nine =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log"
+    ten =   "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log"
 
-    path_list = [first, second]
-    
-    print('===mpnet===')
-    get_val_ppl(mpnet_pc_path,batch_size,device,config)
-    print('===sen_roberta===')
-    get_val_ppl(sbert_roberta_large_pc_path,batch_size,device,config)
-    print('===st5===')
-    get_val_ppl(sentence_T5_large_pc_path,batch_size,device,config)
-    print('===simcse_bert===')
-    get_val_ppl(simcse_bert_large_pc_path,batch_size,device,config)
-    print('===simcse_roberta===')
-    get_val_ppl(simcse_roberta_large_pc_path,batch_size,device,config)
-
-
+    path_list = [first, second, third, forth, fith, six, seven, eight, nine, ten]
+    for p in path_list:
+        print(f'==={p}===')
+        get_val_ppl(p,batch_size,device,config)
