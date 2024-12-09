@@ -38,6 +38,7 @@ def get_sent_list(config):
         return sent_list
     elif dataset == 'fingpt-sentiment': # fingpt-sentiment
         sent_list = get_fingpt_sentiment_data(data_type)
+        return sent_list
     elif dataset == 'snli':
         sent_list = ... # TODO
         return sent_list
@@ -52,11 +53,11 @@ def get_fingpt_sentiment_data(data_type):
     """
     # Load the dataset from Hugging Face
     dataset = load_dataset('FinGPT/fingpt-sentiment-train', cache_dir="data/", split=data_type)
-
+    
     # Extract the 'Input' field from the dataset
     sentence_list = []
     for i, d in enumerate(dataset):
-        sentence_list.append(d['Input'])  # Assuming the field is named 'Input'
+        sentence_list.append(d['input'])  # Assuming the field is named 'Input'
     
     return sentence_list
 
@@ -142,7 +143,7 @@ def get_abcd_data(data_type,path = abcd_path):
 
 
 if __name__ == '__main__':
-
+    
     config = {}
     config['dataset'] = "fingpt-sentiment" # 'abcd'Changed by Marina
     config['data_type'] = 'test'
