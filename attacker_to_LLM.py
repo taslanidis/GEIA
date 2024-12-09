@@ -348,9 +348,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--data_type", type=str, default="test", help="train/test")
     parser.add_argument(
-        "--embed_model",
+        "--embed_model", 
         type=str,
-        default="meta-llama",
+        default="meta-llama2-7b",
         help="Name of embedding model: mistralai/...",
     )
     parser.add_argument(
