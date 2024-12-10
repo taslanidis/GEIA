@@ -1,0 +1,31 @@
+#!/bin/bash 
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --gpus-per-node=1
+#SBATCH --job-name=InstallLLM_masking
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=00:59:58
+#SBATCH --output=./logs/install-llm-masking-%A.out
+
+# entire script fails if a single command fails
+set -e
+
+module purge
+module load 2023
+module load Anaconda3/2023.07-2
+module load CUDA/12.4.0
+
+PROJECT_DIR="$PWD"
+ENV_PREFIX="$PROJECT_DIR"/.env
+
+conda create -p $ENV_PREFIX python=3.10.12 -y
+
+source activate $ENV_PREFIX
+
+pip install torch==2.5.0 torchvision==0.20.0 --index-url https://download.pytorch.org/whl/cu124 --no-cache-dir
+pip install -r requirements.txt --no-cache-dir
+
+conda install -c conda-forge code-server=4.23.1 -y
+
+python -c "import torch; print('CUDA available:', torch.cuda.is_available(), 'Number of GPUs:', torch.cuda.device_count(), 'GPU Name:', torch.cuda.get_device_name(0))"

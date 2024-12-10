@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --partition=gpu_mig
+#SBATCH --gpus=1
+#SBATCH --gpus-per-node=1
+#SBATCH --job-name=DownloadGLM4Weights
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=00:59:58
+#SBATCH --output=download-glm4-weights-%A.out
+
+PROJECT_DIR="$PWD"
+
+mkdir -p /scratch-shared/${USER}/
+
+cd /scratch-shared/${USER}/
+
+rm -r GLM-4
+mkdir -p GLM-4
+cd GLM-4
+
+git lfs install
+
+git clone https://huggingface.co/THUDM/glm-4-9b-chat
+git clone https://huggingface.co/THUDM/glm-4v-9b
+
+cd $PROJECT_DIR
+ln -s /scratch-shared/${USER}/GLM-4/

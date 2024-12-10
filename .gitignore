@@ -19,6 +19,7 @@ models/
 output/
 logs*
 .vscode/
+GLM-4
 
 # Distribution / packaging
 .Python
