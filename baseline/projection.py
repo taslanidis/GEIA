@@ -28,7 +28,7 @@ from torch.utils.data import DataLoader, Dataset
 from attacker_models import SequenceCrossEntropyLoss
 from sentence_transformers import SentenceTransformer
 from simcse_persona import get_persona_dict
-from attacker_evaluation_gpt import eval_on_batch
+# from attacker_evaluation_gpt import eval_on_batch
 from datasets import load_dataset
 import baseline_models
 
@@ -42,7 +42,7 @@ torch.autograd.set_detect_anomaly(True)
 
 logger = logging.getLogger('mylogger')
 logger.setLevel(logging.DEBUG)
-f_handler = logging.FileHandler('logs_correct_thres_DialoGPT-medium/new_datasets.log')
+f_handler = logging.FileHandler('logs/new_datasets.log')
 f_handler.setLevel(logging.INFO)
 f_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s -  %(message)s"))
 logger.addHandler(f_handler)
@@ -56,35 +56,7 @@ def save_blmodel(model, path):
 def load_blmodel(model, path):
     model.load_state_dict(torch.load(path))
 
-'''
-def get_sent_list(config):
-    dataset = config['dataset']
-    data_type = config['data_type']
-    if dataset == 'personachat':
-        sent_list = get_personachat_data(data_type)
-        return sent_list
-    elif dataset == 'qnli':
-        sent_list = get_qnli_data(data_type)
-        return sent_list
-    else:
-        print('Name of dataset only supports: personachat or qnli')
-        sys.exit(-1)
 
-
-def get_personachat_data(data_type):
-    sent_list = get_persona_dict(data_type=data_type)
-    return sent_list
-
-
-def get_qnli_data(data_type):
-    dataset = load_dataset('glue', 'qnli', cache_dir="/home/hlibt/embed_rev/data", split=data_type)
-    sentence_list = []
-    for i, d in enumerate(dataset):
-        sentence_list.append(d['question'])
-        sentence_list.append(d['sentence'])
-    return sentence_list
-
-'''
 class sent_list_dataset(Dataset):
     def __init__(self, sent_list, label):
         assert len(sent_list) == len(label)
@@ -163,8 +135,7 @@ def init_baseline_model(config, embed_model_dim, type='NN'):
 
 
     optimizer = AdamW(baseline_model.parameters(),
-                      lr=6e-5,
-                      eps=1e-06)
+                      lr=3e-4)
     criterion = nn.BCEWithLogitsLoss()  # usage criterion(external_out,input_label)
     baseline_model.to(device)
     return baseline_model, optimizer, criterion
@@ -215,7 +186,7 @@ def train_sent(dataloader, model_name, embed_model_dim, config):
     model = SentenceTransformer(model_name, device=device)
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    save_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
 
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -261,7 +232,7 @@ def train_simcse(dataloader, model_name, embed_model_dim, config):
     num_epochs = config['num_epochs']
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    save_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    save_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
     
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -308,17 +279,17 @@ def report_score(y_true, y_pred):
     precision = metrics.precision_score(y_true, y_pred, average='micro')
     recall = metrics.recall_score(y_true, y_pred, average='micro')
     f1 = metrics.f1_score(y_true, y_pred, average='micro')
-    # logger.info(f"micro precision_score on token level: {precision}")
+    logger.info(f"micro precision_score on token level: {precision}")
     print(f"micro precision_score on token level: {precision}")
-    # print("macro precision_score: {:.2f} ".format( metrics.precision_score(y_true, y_pred, average='macro')))
+    print("macro precision_score: {:.2f} ".format( metrics.precision_score(y_true, y_pred, average='macro')))
     print('==' * 20)
-    # logger.info(f"micro recall_score on token level: {recall}")
+    logger.info(f"micro recall_score on token level: {recall}")
     print(f"micro recall_score on token level: {recall}")
-    # print("macro recall_score: {:.2f} ".format( metrics.recall_score(y_true, y_pred, average='macro')))
+    print("macro recall_score: {:.2f} ".format( metrics.recall_score(y_true, y_pred, average='macro')))
     print('==' * 20)
-    # logger.info(f"micro f1_score on token level: {f1}")
+    logger.info(f"micro f1_score on token level: {f1}")
     print(f"micro f1_score on token level: {f1}")
-    # print("macro f1_score: {:.2f} ".format( metrics.f1_score(y_true, y_pred, average='macro')))
+    print("macro f1_score: {:.2f} ".format( metrics.f1_score(y_true, y_pred, average='macro')))
 
 
 def eval_sent(dataloader, model_name, embed_model_dim, config):
@@ -329,7 +300,7 @@ def eval_sent(dataloader, model_name, embed_model_dim, config):
     hx = torch.zeros(64, 512).cuda()
 
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    model_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    model_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
     baseline_model.load_state_dict(torch.load(model_path))
     baseline_model.eval()
 
@@ -355,7 +326,7 @@ def eval_sent(dataloader, model_name, embed_model_dim, config):
             # print(f'embeddings:{embeddings.size()}')
             # embeddings:torch.Size([64, 1024])    [batch size, feature(dim)]
             if type == 'NN':
-                predict_result = eval_on_batch(baseline_model, criterion, embeddings, batch_label)
+                predict_result = eval_on_batch(baseline_model, criterion, embeddings, batch_label, config['threshold'])
             elif type == 'RNN':
                 zero_tensor = torch.zeros(64, 50257).cuda()
                 # one_tensor = torch.ones(64, 50257).cuda()
@@ -374,7 +345,7 @@ def eval_simcse(dataloader, model_name, embed_model_dim, config):
     num_epochs = config['num_epochs']
     type = config['model_type']
     baseline_model, optimizer, criterion = init_baseline_model(config, embed_model_dim, type=type)
-    model_path = 'blmodels_dialo/' + type + '_' + config['dataset'] + '_' + config['embed_model']
+    model_path = 'blmodels/' + type + '_' + config['dataset'] + '_' + config['embed_model']
     baseline_model.load_state_dict(torch.load(model_path))
     baseline_model.eval()
     log_text = model_path
@@ -402,7 +373,7 @@ def eval_simcse(dataloader, model_name, embed_model_dim, config):
 
             # batch_pred_labels = eval_on_batch(baseline_model,criterion,embeddings,batch_label)
             if type == 'NN':
-                predict_result = eval_on_batch(baseline_model, criterion, embeddings, batch_label)
+                predict_result = eval_on_batch(baseline_model, criterion, embeddings, batch_label, config['threshold'])
             elif type == 'RNN':
                 zero_tensor = torch.zeros(64, 50257).cuda()
                 # one_tensor = torch.ones(64, 50257).cuda()
@@ -415,13 +386,13 @@ def eval_simcse(dataloader, model_name, embed_model_dim, config):
     report_score(ground_truth, predict)
 
 
-def eval_on_batch(baseline_model, criterion, embedding_batch, label_batch):
+def eval_on_batch(baseline_model, criterion, embedding_batch, label_batch, threshold):
     logits = baseline_model(embedding_batch, eval=True)
     loss = criterion(logits, label_batch)
     # print(logits)
     # print(type(logits))
-    logits[logits >= 0.5] = 1
-    logits[logits < 0.5] = 0
+    logits[logits >= threshold] = 1
+    logits[logits < threshold] = 0
     print(f'========eval loss:{loss}')
     return logits
 
@@ -432,71 +403,69 @@ pred labels are (N,dim) 0,1 vectors, where 1 indicate token i show up
 '''
 
 
-def eval_label(pred_labels,ground_truth,input, config,type = 'NN'):
+def eval_label(pred_labels, ground_truth, input_text, config, type='NN'):
+    tokenizer = config['tokenizer']
+    
+    # Convert inputs to tensors more efficiently using numpy first
+    if not torch.is_tensor(pred_labels):
+        pred_labels = torch.from_numpy(np.array(pred_labels))
+    if not torch.is_tensor(ground_truth):
+        ground_truth = torch.from_numpy(np.array(ground_truth))
+    
+    # Get indices where values are 1
+    pred_indices = torch.nonzero(pred_labels, as_tuple=True)
+    gt_indices = torch.nonzero(ground_truth, as_tuple=True)
+    
+    # Create save path based on type
     if type == 'NN':
-        #pred = torch.nonzero(pred_labels)  # 2 dim (N,vocab_size)
         threshold = config['threshold']
-        tokenizer = config['tokenizer']
-        pred = [[] for i in range(len(pred_labels))]
-        gt = [[] for i in range(len(pred_labels))]
-        ####log_text = model_path+'_threshold_'+str(threshold)
         str_threshold = f'{threshold:.2f}'
-        # save_path = 'qnli/' + type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
-        save_path = 'logs_test_correct_thres_DialoGPT-medium/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label'
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-        for idx,label_list in enumerate(pred_labels):
-            print("pred_labels idx:",idx)
-            for i,value in enumerate(label_list):
-                if(value > 0):
-                    assert value == 1
-                    pred[idx].append(tokenizer.decode(i))  # append a string to a list
-
-        for idx,label_list in enumerate(ground_truth):
-            print("ground_truth idx:",idx)
-            for i,value in enumerate(label_list):
-                if(value > 0):
-                    assert value == 1
-                    gt[idx].append(tokenizer.decode(i))  # append a string to a list
-
-        save_data = []
-        for i in range(len(pred_labels)):
-            save_dict = {}
-            save_dict['pred'] = pred[i]
-            save_dict['gt'] = gt[i]
-            save_dict['input'] = input[i]
-            save_data.append(save_dict)
-        with open(save_path, 'w') as f:
-           json.dump(save_data, f,indent=4)
+        save_path = f'logs/test_{type}_{config["dataset"]}_{config["embed_model"]}_threshold_{str_threshold}.label'
     else:
-        tokenizer = config['tokenizer']
-        pred = [[] for i in range(len(pred_labels))]
-        gt = [[] for i in range(len(pred_labels))]
-        save_path = 'logs_test_correct_thres_DialoGPT-medium/' +'test_' + type + '_' + config['dataset'] + '_' + config['embed_model'] + '.label'
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        # save_path = 'logs_test/' +'test_' +type + '_' + config['dataset'] + '_' + config['embed_model'] +'_threshold_'+str(str_threshold)+'.label
+        save_path = f'logs/test_{type}_{config["dataset"]}_{config["embed_model"]}.label'
+    
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    
 
-        for idx, label_list in enumerate(pred_labels):
-            for i, value in enumerate(label_list):
-                if (value > 0):
-                    assert value == 1
-                    pred[idx].append(tokenizer.decode(i))  # append a string to a list
-
-        for idx, label_list in enumerate(ground_truth):
-            for i, value in enumerate(label_list):
-                if (value > 0):
-                    assert value == 1
-                    gt[idx].append(tokenizer.decode(i))  # append a string to a list
-
-        save_data = []
-        for i in range(len(pred_labels)):
-            save_dict = {}
-            save_dict['pred'] = pred[i]
-            save_dict['gt'] = gt[i]
-            save_dict['input'] = input[i]
-            save_data.append(save_dict)
-        with open(save_path, 'w') as f:
-            json.dump(save_data, f, indent=4)
+    BATCH_SIZE = config['batch_size'] 
+    
+    pred_tokens = []
+    for i in range(0, len(pred_indices[1]), BATCH_SIZE):
+        # Ensure end index doesn't exceed array length
+        end_idx = min(i + BATCH_SIZE, len(pred_indices[1]))
+        batch = pred_indices[1][i:end_idx].reshape(-1, 1)
+        pred_tokens.extend(tokenizer.batch_decode(batch))
+    
+    gt_tokens = []
+    for i in range(0, len(gt_indices[1]), BATCH_SIZE):
+        # Ensure end index doesn't exceed array length
+        end_idx = min(i + BATCH_SIZE, len(gt_indices[1]))
+        batch = gt_indices[1][i:end_idx].reshape(-1, 1)
+        gt_tokens.extend(tokenizer.batch_decode(batch))
+    
+    # Group tokens by sample index
+    pred_grouped = [[] for _ in range(len(input_text))]
+    gt_grouped = [[] for _ in range(len(input_text))]
+    
+    # Use tensor operations to group tokens
+    for idx, token in zip(pred_indices[0].tolist(), pred_tokens):
+        pred_grouped[idx].append(token)
+    for idx, token in zip(gt_indices[0].tolist(), gt_tokens):
+        gt_grouped[idx].append(token)
+    
+    # Create save data structure
+    save_data = [
+        {
+            'pred': pred_grouped[i],
+            'gt': gt_grouped[i],
+            'input': input_text[i]
+        }
+        for i in range(len(input_text))
+    ]
+    
+    # Save results
+    with open(save_path, 'w') as f:
+        json.dump(save_data, f, indent=4)
 
 
 if __name__ == '__main__':
@@ -528,34 +497,39 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     config = {}
-    model_thres = {'mpnet': 0.2, 'sent_roberta': 0.2, 'simcse_bert': 0.5, 'simcse_roberta': 0.5, 'sent_t5': 0.1}
+    if args.dataset == 'personachat':
+        model_thres = {'mpnet': 0.2, 'sent_roberta': 0.2, 'simcse_bert': 0.5, 'simcse_roberta': 0.5, 'sent_t5': 0.1}
+    elif args.dataset == 'qnli':
+        model_thres = {'mpnet': 0.45, 'sent_roberta': 0.2, 'simcse_bert': 0.6, 'simcse_roberta': 0.75, 'sent_t5': 0.2}
+    if args.data_type == 'train':
+        config['model_dir'] = args.model_dir
+        config['num_epochs'] = args.num_epochs
+        config['batch_size'] = args.batch_size
+        config['dataset'] = args.dataset
+        config['data_type'] = args.data_type
+        config['embed_model'] = args.embed_model
+        config['model_type'] = args.model_type
+        
+        config['threshold'] = model_thres[args.embed_model]
+
+        config['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        config['tokenizer'] = AutoTokenizer.from_pretrained(args.model_dir)
+        config['eos_token'] = config['tokenizer'].eos_token
+        config['tokenizer'].pad_token = config['eos_token']
+        sent_list = get_sent_list(config)
+
+        #dataset = sent_list_dataset(sent_list, onehot_labels)
+        dataset = collated_dataset(sent_list,config)
+        dataloader = DataLoader(dataset=dataset,
+                                shuffle=False,
+                                batch_size=config['batch_size'],
+                                collate_fn=dataset.collate,
+                                drop_last=True)
+        get_embedding(dataloader, config, eval=False)
+    
+    # for evaluation
     config['model_dir'] = args.model_dir
     config['num_epochs'] = args.num_epochs
-    config['batch_size'] = args.batch_size
-    config['dataset'] = args.dataset
-    config['data_type'] = args.data_type
-    config['embed_model'] = args.embed_model
-    config['model_type'] = args.model_type
-    
-    config['threshold'] = model_thres[args.embed_model]
-
-    config['device'] = torch.device("cuda")
-    config['tokenizer'] = AutoTokenizer.from_pretrained(args.model_dir)
-    config['eos_token'] = config['tokenizer'].eos_token
-    config['tokenizer'].pad_token = config['eos_token']
-    sent_list = get_sent_list(config)
-
-    #dataset = sent_list_dataset(sent_list, onehot_labels)
-    dataset = collated_dataset(sent_list,config)
-    dataloader = DataLoader(dataset=dataset,
-                            shuffle=False,
-                            batch_size=config['batch_size'],
-                            collate_fn=dataset.collate,
-                            drop_last=True)
-    # for training
-    if config['data_type'] == 'train':
-        get_embedding(dataloader, config, eval=False)
-    # for evaluation
     config['batch_size'] = args.batch_size
     config['dataset'] = args.dataset
     config['data_type'] = 'test'
@@ -563,7 +537,7 @@ if __name__ == '__main__':
     config['model_type'] = args.model_type
     config['threshold'] = model_thres[args.embed_model]
 
-    config['device'] = torch.device("cuda")
+    config['device'] = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     config['tokenizer'] = AutoTokenizer.from_pretrained(args.model_dir)
     config['eos_token'] = config['tokenizer'].eos_token
     config['tokenizer'].pad_token = config['eos_token']

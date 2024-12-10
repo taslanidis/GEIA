@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --partition=gpu_a100
+#SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=04:00:00
-#SBATCH --output=./output_threshold_sweep_correct_DialoGPT-medium_tokenizer/%x-%j.out
+#SBATCH --output=./output/%x.out
 
 # entire script fails if a single command fails
 set -e
@@ -13,10 +13,9 @@ set -e
 module purge
 module load 2023
 module load Anaconda3/2023.07-2
+module load CUDA/12.4.0
 
-PROJECT_DIR="$PWD"
-ENV_PREFIX="$PROJECT_DIR"/.env
 
-source activate $ENV_PREFIX
+source activate .env/
 
 python baseline/projection.py "$@"
