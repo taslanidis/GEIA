@@ -1,0 +1,12 @@
+[
+    {
+        "original": "Annie decided to become a lawyer",
+        "masked": "Annie decided to become a <mask>",
+        "similar": "Annie decided to become a doctor"
+    },
+    {
+        "original": "John was the first person I met",
+        "masked": "<mask> was the first person I met",
+        "similar": "Jennifer was the first person I met"
+    }
+]

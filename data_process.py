@@ -13,6 +13,18 @@ list of supported datasets:
 '''
 
 
+def get_extension_data(path: str):
+    
+    with open(path, 'r') as f:
+        data = json.load(f)
+
+    original = [s['original'] for s in data]
+    masked = [s['masked'] for s in data]
+    similar = [s['similar'] for s in data]
+
+    return original, masked, similar
+
+
 def get_sent_list(config):
     dataset = config['dataset']
     data_type = config.get('data_type')
@@ -37,8 +49,8 @@ def get_sent_list(config):
     elif dataset == 'abcd':#abcd
         sent_list = get_abcd_data(data_type)
         return sent_list
-    elif dataset == 'snli':
-        sent_list = ... # TODO
+    elif dataset == 'extension':
+        sent_list = get_extension_data(config['dataset_path'])
         return sent_list
     else:
         print('Name of dataset only supports: personachat or qnli')
