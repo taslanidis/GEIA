@@ -125,7 +125,7 @@ def process_data(
     #     3.b Calculate the loss compared of the generated text, and the GT text
     print_first_decode = True
     count = 0
-    for i in range(num_epochs):
+    for epoch in range(num_epochs):
         for idx, (batch_text, last_hidden_state) in enumerate(
             tqdm(dataloader, desc="Processing Batches")
         ):
@@ -155,7 +155,7 @@ def process_data(
             #     f"Training: epoch {i} batch {idx} with loss: {record_loss} and PPL {perplexity} with size {embeddings.size()}"
             # )
 
-            wandb.log({"record_loss": record_loss, "perplexity": perplexity})
+            wandb.log({"record_loss": record_loss, "perplexity": perplexity, "epoch": epoch})
 
         if need_proj:
             torch.save(projection.state_dict(), config["projection_save_path"])
@@ -187,7 +187,8 @@ def process_data_test(dataset: LLM_dataset, config: dict):
         embedding_dim=config["victim_emb_size"],
         sequence_length=config["max_new_tokens"] - 1,
         model_type=config["sentence_aggregation"],
-    ).to(config["device"])
+    )
+
     sentence_embedding_model.load_state_dict(
         torch.load(config["sentence_embedding_model_save_path"])
     )
@@ -198,7 +199,7 @@ def process_data_test(dataset: LLM_dataset, config: dict):
 
     if need_proj:
         projection = linear_projection(
-            in_num=config["attacker_emb_size"], out_num=config["victim_emb_size"]
+            in_num=config["victim_emb_size"], out_num=config["attacker_emb_size"]
         )
         projection.load_state_dict(torch.load(config["projection_save_path"]))
         projection.to(config["device"])
@@ -240,12 +241,6 @@ def process_data_test(dataset: LLM_dataset, config: dict):
             sent_dict["pred"].extend(sent_list)
             sent_dict["gt"].extend(gt_list)
 
-            print("gt_list", gt_list)
-            print("sent_list", sent_list)
-            if count == 5:
-                exit()
-            count += 1
-            print("---------")
         with open(save_path, "w") as f:
             json.dump(sent_dict, f, indent=4)
 
@@ -369,6 +364,12 @@ if __name__ == "__main__":
         default="./LLM_hidden_states/",
         help="The path to save the LLM last hidden states",
     )
+    parser.add_argument(
+        "--percentage_of_dataset",
+        type=int,
+        default=10,
+        help="how much of the dataset do you want to upload",
+    )
     args = parser.parse_args()
 
     config = {}
@@ -382,6 +383,8 @@ if __name__ == "__main__":
     config["embed_model_path"] = model_cards[config["embed_model"]]
     config["sentence_aggregation"] = args.sentence_aggregation
     config["max_new_tokens"] = args.max_new_tokens
+    config['use_opt'] = False
+    config["last_hidden_states_flag"] = True
 
     # custom save paths
     attacker_model: str = (
@@ -390,7 +393,7 @@ if __name__ == "__main__":
 
     config[
         "save_embedding"
-    ]: str = f"{args.save_embedding}/saved_embeddings_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}_{config['data_type']}"
+    ]: str = f"{args.save_embedding}/saved_embeddings_{config['dataset']}_{config['embed_model']}_{config['max_new_tokens']}_{config['data_type']}_{args.percentage_of_dataset}"
 
     attacker_save_name: str = (
         f"attacker_{attacker_model}_{config['dataset']}_{config['embed_model']}_{config['sentence_aggregation']}_{config['max_new_tokens']}"
@@ -435,21 +438,16 @@ if __name__ == "__main__":
 
     sent_list = get_sent_list(config)
     the_original_dataset: Dataset = original_dataset(sent_list)
-    # reduce the original_dataset to just 20% samples to check the code
-<<<<<<< HEAD
-    print("len(the_original_dataset)*0.01",len(the_original_dataset)*0.01)
-    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(np.floor(len(the_original_dataset)*0.01).astype(int)))
-=======
-    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(int(len(the_original_dataset)*0.20)))
->>>>>>> refs/remotes/origin/LLM-addition
+    # reduce the original_dataset to just args.percentage_of_dataset samples to check the code
+    the_original_dataset = torch.utils.data.Subset(the_original_dataset, range(np.floor(len(the_original_dataset) * args.percentage_of_dataset/100).astype(int)))
     the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
 
-    # if config["data_type"] == "train":
-    #     # -- Training --
-    #     process_data(the_LLM_dataset, config)
+    if config["data_type"] == "train":
+        # -- Training --
+        process_data(the_LLM_dataset, config)
 
-    # elif config["data_type"] == "test":
-    #     # -- Inference --
-    #     process_data_test(the_LLM_dataset, config)
+    elif config["data_type"] == "test":
+        # -- Inference --
+        process_data_test(the_LLM_dataset, config)
 
     wandb.finish()

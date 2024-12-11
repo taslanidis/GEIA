@@ -138,6 +138,10 @@ def metric_token(log_path):
     logger.info(f'word level precision: {str(precision)}')
     logger.info(f'word level recall: {str(recall)}')
     logger.info(f'word level f1: {str(f1)}')
+
+    print(f'word level precision: {str(precision)}')
+    print(f'word level recall: {str(recall)}')
+    print(f'word level f1: {str(f1)}')
     
     precision,recall,f1 = word_level_metrics(y_true_removed_p,y_pred_removed_p)
     logger.info(f'word level precision without punctuation: {str(precision)}')
@@ -177,7 +181,9 @@ if __name__ == '__main__':
     first = "./attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
     second = "./attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
 
-    path_list = [first, second]
+    # path_list = [first, second]
+    path_list = ["./logs/attacker_dialogpt2_personachat_meta-llama_sentence-t5-base_20_beam.log"]
     for p in path_list:
         logger.info(f'====={p}=====')
+        print(f'====={p}=====')
         metric_token(p)

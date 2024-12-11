@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
+from sentence_transformers import SentenceTransformer
+import torch
 
 # Sentence Model
 class Sentence_Embedding_model(nn.Module):
-    def __init__(self, embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean"):
+    def __init__(self, embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean", device:torch.cuda.device = None):
         super(Sentence_Embedding_model, self).__init__()
 
         if model_type == "mean":
@@ -14,10 +16,10 @@ class Sentence_Embedding_model(nn.Module):
             self.model = Conv1DMapping(sequence_length)
         elif model_type == "self-attention":
             self.model = MultiheadAttentionMapping(embedding_dim, num_heads=4)
-        elif model_type == "encoder":
-            raise Exception("Not implemented")
-        else:
-            raise Exception("Not understand")
+        else: 
+            print("Will try to find a sentence embedding model")
+            self.model = SentenceTransformer(model_type, device=device)   # dim 768
+
     
     def forward(self,x):
         return self.model(x) 

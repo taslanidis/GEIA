@@ -84,7 +84,7 @@ def process_data(
     ):
 
     # Victim model (model f)
-    model = SentenceTransformer(config['embed_model_path'], device=device)   # dim 768
+    model = SentenceTransformer(config[''], device=device)   # dim 768
     dataset = personachat(data)
     dataloader = DataLoader(dataset=dataset, 
                               shuffle=True, 

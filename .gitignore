@@ -8,6 +8,7 @@ __pycache__/
 *.label
 
 # DATA
+data
 data.zip
 data/abcd/
 LLM_hidden_states

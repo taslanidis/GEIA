@@ -178,7 +178,7 @@ def eval_on_batch(
     if(not config['use_opt']):
         tokenizer.pad_token = tokenizer.eos_token
     batch_X = batch_X.to(device)
-    print(f'Batch_X: {batch_X.size()}')
+    # print(f'Batch_X: {batch_X.size()}')
     sent_list = []
     gt_list = batch_D
 
@@ -227,7 +227,7 @@ def eval_on_batch_fast(
     num_beams: int = 5
 
     batch_X = batch_X.to(device)
-    print(f'Batch_X: {batch_X.size()}')
+    # print(f'Batch_X: {batch_X.size()}')
     inputs_embeds = batch_X.unsqueeze(1)
     attention_mask = torch.ones(inputs_embeds.size()[:-1], device=device)  # Assuming no padding in embeddings
 
@@ -271,7 +271,6 @@ def main():
     config['batch_size'] = attacker_models.batch_size
     config['data_type'] = args.data_type
     config['device']  = torch.device("cuda")
-
     config['use_trans'] = True
     config['model'] = AutoModelForCausalLM.from_pretrained(config['model_dir'])
     config['tokenizer'] = tokenizer

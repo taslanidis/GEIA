@@ -176,6 +176,8 @@ if __name__ == '__main__':
     second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
 
     path_list = [first, second]
+
+    path_list = ["./logs/attacker_dialogpt2_personachat_meta-llama_linear_20_beam.log"]
     for p in path_list:
         print(f'==={p}===')
         data = read_gpt(p)
