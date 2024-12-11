@@ -303,6 +303,7 @@ if __name__ == "__main__":
     model_cards["mistralai"] = "mistralai/Mistral-7B-v0.1"
     model_cards["t5-base"] = "google-t5/t5-base"
     model_cards["meta-llama"] = "meta-llama/Meta-Llama-3-8B"
+    model_cards["meta-llama2-7b"] = "meta-llama/Llama-2-7b-chat-hf"
 
     parser = argparse.ArgumentParser(
         description="Training external decoder to attack an LLM"

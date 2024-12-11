@@ -120,25 +120,37 @@ class LLM_dataset(Dataset):
         hidden_states.mkdir(parents=True, exist_ok=True)
 
         with torch.no_grad():
+            sys_prompt = "The following is a friendly conversation between a human and an AI. The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human. If the AI does not know the answer to a question, it truthfully says it does not know. Your task is to just output the response of the AI not the human as well. Current conversation:"
             epoch = 0
             for batch in tqdm(dataloader, desc="Generating embeddings"):
+                batch_with_prompt = [
+                    [
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": {prompt}}
+                    ] for prompt in batch
+                ]
                 # Prepend the prompt to each item in the batch
-                batch_with_prompt = [f"""The following is a friendly conversation between a human and an AI.
-                    The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human.
-                    If the AI does not know the answer to a question, it truthfully says it does not know.
-                    Your task is to provide a short, concise response as the AI, without including any follow-up from the human.
-                    Current conversation:
-                    Human: {item}
-                    AI:""" for item in batch]
+                # batch_with_prompt = [f"""The following is a friendly conversation between a human and an AI.
+                    # The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human.
+                    # If the AI does not know the answer to a question, it truthfully says it does not know.
+                    # Your task is to provide a short, concise response as the AI, without including any follow-up from the human.
+                    # Current conversation:
+                    # Human: {item}
+                    # AI:""" for item in batch]
 
                 # Tokenize the batch with the prompt added
-                tokenized_batch = tokenizer(
-                    batch, padding=True, return_tensors="pt"
-                ).to(config["device"])
-
-                tokenized_prompt_batch = tokenizer(
-                    batch_with_prompt, padding=True, return_tensors="pt"
-                ).to(config["device"])
+                tokenized_batch = tokenizer.apply_chat_template(
+                                batch_with_prompt,
+                                add_generation_prompt=True,
+                                tokenize=True,
+                                return_tensors=None,  # Avoid returning PyTorch tensors for compatibility
+                                return_dict=True
+                            )
+                #tokenizer(batch, padding=True, return_tensors="pt").to(config["device"])
+                tokenized_prompt_batch = tokenized_batch.to(device)
+                # tokenized_prompt_batch = tokenizer(
+                #     batch_with_prompt, padding=True, return_tensors="pt"
+                # ).to(config["device"])
 
                 output = model.generate(
                     **tokenized_prompt_batch,
