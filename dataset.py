@@ -73,13 +73,20 @@ class LLM_dataset(Dataset):
         hidden_states.mkdir(parents=True, exist_ok=True)
 
         with torch.no_grad():
+            sys_prompt = "The following is a friendly conversation between a human and an AI. The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human. If the AI does not know the answer to a question, it truthfully says it does not know. Your task is to just output the response of the AI not the human as well. Current conversation:"
             for batch in tqdm(dataloader, desc="Generating embeddings"):
                 # Prepend the prompt to each item in the batch
-                batch_with_prompt = [f"""The following is a friendly conversation between a human and an AI. The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human. If the AI does not know the answer to a question, it truthfully says it does not know.
-                    Your task is to just output the response of the AI not the human as well.
-                    Current conversation:
-                    Human: {item}
-                    AI:""" for item in batch]
+                batch_with_prompt = [
+                    [
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": {prompt}}
+                    ] for prompt in batch
+                ]
+                # batch_with_prompt = [f"""The following is a friendly conversation between a human and an AI. The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human. If the AI does not know the answer to a question, it truthfully says it does not know.
+                #     Your task is to just output the response of the AI not the human as well.
+                #     Current conversation:
+                #     Human: {item}
+                #     AI:""" for item in batch]
 
                 # Tokenize the batch with the prompt added
                 tokenized_batch = tokenizer(
