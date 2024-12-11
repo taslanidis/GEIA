@@ -36,12 +36,30 @@ def get_sent_list(config):
     elif dataset == 'abcd':#abcd
         sent_list = get_abcd_data(data_type)
         return sent_list
+    elif dataset == 'fingpt-sentiment': # fingpt-sentiment
+        sent_list = get_fingpt_sentiment_data(data_type)
+        return sent_list
     elif dataset == 'snli':
         sent_list = ... # TODO
         return sent_list
     else:
         print('Name of dataset only supports: personachat or qnli')
         sys.exit(-1)
+
+# Added dataset for comparison
+def get_fingpt_sentiment_data(data_type):
+    """
+    Processes the FinGPT sentiment dataset.
+    """
+    # Load the dataset from Hugging Face
+    dataset = load_dataset('FinGPT/fingpt-sentiment-train', cache_dir="data/", split=data_type)
+    
+    # Extract the 'Input' field from the dataset
+    sentence_list = []
+    for i, d in enumerate(dataset):
+        sentence_list.append(d['input'])  # Assuming the field is named 'Input'
+    
+    return sentence_list
 
 
 def get_personachat_data(data_type):
@@ -125,9 +143,9 @@ def get_abcd_data(data_type,path = abcd_path):
 
 
 if __name__ == '__main__':
-
+    
     config = {}
-    config['dataset'] = 'abcd'
+    config['dataset'] = "fingpt-sentiment" # 'abcd'Changed by Marina
     config['data_type'] = 'test'
     sent_list = get_sent_list(config)
     pprint(sent_list[:10])

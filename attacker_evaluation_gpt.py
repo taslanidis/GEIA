@@ -137,7 +137,7 @@ def generate_sentence(config,hidden_X):
     return output
 
 
-def eval(dataloader, config):
+def eval(dataloader,config):
     model = config['model']
     tokenizer = config['tokenizer']
     device = config['device']
@@ -148,7 +148,7 @@ def eval(dataloader, config):
     sent_dict['pred'] = []
 
     with torch.no_grad():
-        for idx, (batch_X,batch_D) in enumerate(dataloader):
+        for idx,(batch_X,batch_D) in enumerate(dataloader):
             batch_D = list(batch_D)
             sent_list, gt_list = eval_on_batch(
                 batch_X,
