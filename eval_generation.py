@@ -174,6 +174,19 @@ if __name__ == '__main__':
 
     first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
     second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    third = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log"
+    # "logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    forth =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log"
+    fith = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log"
+    # "logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    six = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log"
+    seven =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log"
+    eight =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log"
+    nine =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log"
+    ten =   "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log"
+
+    extension = "/home/marina/GEIA/extensionv3.log"
+    path_list = [extension]
 
     path_list = [first, second]
 
