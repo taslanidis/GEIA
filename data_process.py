@@ -1,5 +1,7 @@
 from simcse_persona import get_persona_dict
 from datasets import load_dataset
+from torch.utils.data import random_split, Dataset
+import torch
 from pprint import pprint
 import config
 import json
@@ -15,6 +17,8 @@ list of supported datasets:
 def get_sent_list(config):
     dataset = config['dataset']
     data_type = config.get('data_type')
+    # Set seed for reproducibility
+    torch.manual_seed(config["seed"])
     if dataset == 'personachat':
         sent_list = get_personachat_data(data_type)
         return sent_list
@@ -52,8 +56,18 @@ def get_fingpt_sentiment_data(data_type):
     Processes the FinGPT sentiment dataset.
     """
     # Load the dataset from Hugging Face
-    dataset = load_dataset('FinGPT/fingpt-sentiment-train', cache_dir="data/", split=data_type)
-    
+    dataset = load_dataset('FinGPT/fingpt-sentiment-train', cache_dir="data/", split="train")
+    dataset_size = len(dataset)
+    split_20 = int(0.2 * dataset_size)
+    split_80 = dataset_size - split_20
+
+    # Perform random split
+    subset_20, subset_80 = random_split(dataset, [split_20, split_80])
+    if data_type == "test":
+        dataset = subset_20
+    else:
+        dataset = subset_80
+
     # Extract the 'Input' field from the dataset
     sentence_list = []
     for i, d in enumerate(dataset):

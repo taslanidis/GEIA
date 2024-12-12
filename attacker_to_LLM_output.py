@@ -326,7 +326,7 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="personachat",
-        help="Name of dataset: personachat or qnli",
+        help="Name of dataset: personachat or qnli or fingpt-sentiment",
     )
     parser.add_argument("--data_type", type=str, default="test", help="train/test")
     parser.add_argument(
@@ -359,6 +359,12 @@ if __name__ == "__main__":
         default=10,
         help="how much of the dataset do you want to upload",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=14,
+        help="What should be the seed",
+    )
     args = parser.parse_args()
 
     config = {}
@@ -372,6 +378,7 @@ if __name__ == "__main__":
     config["embed_model_path"] = model_cards[config["embed_model"]]
     config["sentence_aggregation"] = args.sentence_aggregation
     config["max_new_tokens"] = args.max_new_tokens
+    config["seed"] = args.seed
     config['use_opt'] = False
     config["last_hidden_states_flag"] = False
 
