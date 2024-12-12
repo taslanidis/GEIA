@@ -22,4 +22,4 @@ source activate $ENV_PREFIX
 
 python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('CUDA device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No CUDA device')"
 
-python attacker_to_LLM_output.py --data_type train --dataset qnli --sentence_aggregation sentence-t5-base --batch_size 16 --num_epochs 5 --percentage_of_dataset 1
+python attacker_to_LLM_output.py --data_type train --sentence_aggregation sentence-t5-base --batch_size 16 --num_epochs 5 --percentage_of_dataset 1

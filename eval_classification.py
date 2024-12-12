@@ -182,7 +182,7 @@ if __name__ == '__main__':
     second = "./attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
 
     # path_list = [first, second]
-    path_list = ["./logs/attacker_dialogpt2_personachat_meta-llama_sentence-t5-base_20_beam.log"]
+    path_list = ["./logs/attacker_dialogpt2_personachat_meta-llama_sentence-t5-base_40_beam.log"]
     for p in path_list:
         logger.info(f'====={p}=====')
         print(f'====={p}=====')

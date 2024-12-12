@@ -126,7 +126,7 @@ class LLM_dataset(Dataset):
                 batch_with_prompt = [
                     [
                         {"role": "system", "content": sys_prompt},
-                        {"role": "user", "content": {prompt}}
+                        {"role": "user", "content": prompt}
                     ] for prompt in batch
                 ]
                 # Prepend the prompt to each item in the batch
@@ -139,18 +139,19 @@ class LLM_dataset(Dataset):
                     # AI:""" for item in batch]
 
                 # Tokenize the batch with the prompt added
-                tokenized_batch = tokenizer.apply_chat_template(
+                tokenized_batch_with_chat_template = tokenizer.apply_chat_template(
                                 batch_with_prompt,
                                 add_generation_prompt=True,
                                 tokenize=True,
                                 return_tensors=None,  # Avoid returning PyTorch tensors for compatibility
                                 return_dict=True
                             )
-                #tokenizer(batch, padding=True, return_tensors="pt").to(config["device"])
-                tokenized_prompt_batch = tokenized_batch.to(device)
-                # tokenized_prompt_batch = tokenizer(
-                #     batch_with_prompt, padding=True, return_tensors="pt"
-                # ).to(config["device"])
+
+                tokenized_prompt_batch = tokenizer.pad(
+                    tokenized_batch_with_chat_template,
+                    padding=True,  # Add padding to the shorter sequences
+                    return_tensors="pt"  # Convert the padded sequences to PyTorch tensors
+                ).to(config["device"])
 
                 output = model.generate(
                     **tokenized_prompt_batch,
@@ -190,7 +191,7 @@ class LLM_dataset(Dataset):
                 )
                         
                 # Explicitly delete tensors and clear cache
-                del tokenized_batch, output
+                del batch_with_prompt, tokenized_batch_with_chat_template, tokenized_prompt_batch, output
                 # , batch_last_hidden_state
                 torch.cuda.empty_cache()
 
