@@ -59,10 +59,9 @@ def mask_passage_batch(prompts: list, model, tokenizer, do_sample: bool, max_len
     }
     with torch.no_grad():
         outputs = model.generate(**padded_inputs, **gen_kwargs)
-
-    # Decode batched outputs
-    generated_txts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-
+        outputs = outputs[:, padded_inputs['input_ids'].shape[1] + 1:]
+        generated_txts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        print(generated_txts[0])
     return generated_txts
 
 
@@ -93,7 +92,7 @@ if __name__ == "__main__":
     ).eval()
 
     # Create a DataLoader for batching
-    batch_size = 512  # Adjust batch size as needed
+    batch_size = 128  # Adjust batch size as needed
     data_loader = DataLoader(
     dataset['train'], 
     batch_size=batch_size, 
@@ -110,14 +109,13 @@ if __name__ == "__main__":
             masked_txts = mask_passage_batch(prompts, model, tokenizer, do_sample=True, max_length=args.max_length, temperature=args.temperature, top_p=args.top_p)
 
             # Log the original and generated texts in JSON format
-            # for example, masked_txt in zip(batch, masked_txts):
-            #     log_entry = {
-            #         "simplified": example['simplified'],
-            #         "text": example['text'],
-            #         "masked": masked_txt
-            #     }
-            #     json.dump(log_entry, f, ensure_ascii=False)
-            #     f.write('\n')  # Write a newline for each entry to separate them
+            for original_txt, masked_txt in zip(batch['simplified'], masked_txts):
+                log_entry = {
+                    "original": original_txt,
+                    "masked": masked_txt
+                }
+                json.dump(log_entry, f, ensure_ascii=False)
+                f.write('\n')  # Write a newline for each entry to separate them
 
 #example usage
 # python LLM_expert_masking.py
