@@ -351,7 +351,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_embedding",
         type=str,
-        default="./LLM_hidden_states/",
+        default="./LLM_hidden_states2/",
         help="The path to save the LLM last hidden states",
     )
     parser.add_argument(
