@@ -370,6 +370,12 @@ if __name__ == "__main__":
         default=10,
         help="how much of the dataset do you want to upload",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=14,
+        help="What should be the seed",
+    )
     args = parser.parse_args()
 
     config = {}
@@ -385,6 +391,7 @@ if __name__ == "__main__":
     config["max_new_tokens"] = args.max_new_tokens
     config['use_opt'] = False
     config["last_hidden_states_flag"] = True
+    config["seed"]=args.seed
 
     # custom save paths
     attacker_model: str = (

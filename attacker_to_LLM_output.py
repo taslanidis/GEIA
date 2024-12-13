@@ -300,8 +300,9 @@ def train_on_batch(
 
 if __name__ == "__main__":
     model_cards = {}
-    model_cards["mistralai"] = "mistralai/Mistral-7B-v0.1"
-    model_cards["t5-base"] = "google-t5/t5-base"
+    model_cards['sent_t5_base'] = 'sentence-t5-base'
+    model_cards['sent_roberta'] = 'all-roberta-large-v1'
+
     model_cards["meta-llama"] = "meta-llama/Meta-Llama-3-8B"
     model_cards["meta-llama2-7b"] = "meta-llama/Llama-2-7b-chat-hf"
 
@@ -345,7 +346,7 @@ if __name__ == "__main__":
         "--sentence_aggregation",
         type=str,
         default="sentence-t5-base",
-        help="Name of sentence embending creation methods: mean/linear/convolution/self-attention/encoder",
+        help="Name of sentence embending creation methods: sent_roberta/sent_t5_base/trained_sent_roberta",
     )
     parser.add_argument(
         "--save_embedding",
@@ -375,8 +376,8 @@ if __name__ == "__main__":
     config["data_type"] = args.data_type
     config["embed_model"] = args.embed_model
     config["decode"] = args.decode
-    config["embed_model_path"] = model_cards[config["embed_model"]]
-    config["sentence_aggregation"] = args.sentence_aggregation
+    config["embed_model_path"] = model_cards[config["embed_model"]] if config["embed_model"] in model_cards else config["embed_model"]
+    config["sentence_aggregation"] = model_cards[args.sentence_aggregation] if args.sentence_aggregation in model_cards else args.sentence_aggregation
     config["max_new_tokens"] = args.max_new_tokens
     config["seed"] = args.seed
     config['use_opt'] = False

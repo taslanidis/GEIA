@@ -4,7 +4,7 @@ from tqdm import tqdm
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModelForCausalLM
-
+import gc
 
 class original_dataset(Dataset):
     def __init__(self, data):
@@ -57,10 +57,13 @@ class LLM_dataset(Dataset):
                 hidden_states_list.append(batch_data["hidden_states"])
         
             self.mapping = {}
+            flag = True
             for text_batch, hidden_state_batch in tqdm(zip(decoded_texts, hidden_states_list), "ziping text with corresponding last_hidden_state"):
                 for text, hidden_state in zip(text_batch, hidden_state_batch):
                     self.mapping[text] = hidden_state
-
+                    if flag:
+                        print("\n An example of the input:",text)
+                        flag = False
             del tokenizer
             torch.cuda.empty_cache()
         else:
@@ -90,7 +93,7 @@ class LLM_dataset(Dataset):
         LLM_output = None
         if self.last_hidden_states_flag:
             LLM_output = [self.mapping[text] for text in batch_input]
-            LLM_output = torch.stack(hidden_states)
+            LLM_output = torch.stack(LLM_output)
         else:
             LLM_output = [self.mapping[text] for text in batch_input]
         return batch_input, LLM_output
@@ -99,6 +102,7 @@ class LLM_dataset(Dataset):
         model = AutoModelForCausalLM.from_pretrained(
             config["embed_model_path"], device_map=config["device"]
         )  # dim 768
+        model.eval()
         tokenizer = AutoTokenizer.from_pretrained(
             config["embed_model_path"], padding_side="left"
         )
@@ -123,6 +127,20 @@ class LLM_dataset(Dataset):
             sys_prompt = "The following is a friendly conversation between a human and an AI. The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human. If the AI does not know the answer to a question, it truthfully says it does not know. Your task is to just output the response of the AI not the human as well. Current conversation:"
             epoch = 0
             for batch in tqdm(dataloader, desc="Generating embeddings"):
+                flag= False
+                print("EPOCH",epoch)
+                # for i in batch:
+                #     if len(i)>=2000:
+                #         print("LEN[i]",len(i))
+                #         flag=True
+                # if not flag:
+                #     epoch+=1
+                #     continue
+
+                tokenized_without_prompt = tokenizer(
+                    batch, padding=True, return_tensors="pt"
+                ).to(config["device"])
+
                 batch_with_prompt = [
                     [
                         {"role": "system", "content": sys_prompt},
@@ -160,7 +178,7 @@ class LLM_dataset(Dataset):
                     top_p=0.9,
                     temperature=0.8,
                     # num_beams=2,
-                    length_penalty=0.9,
+                    # length_penalty=0.9,
                     repetition_penalty=1.2,
                     max_new_tokens=config["max_new_tokens"],
                     output_hidden_states=False,
@@ -173,7 +191,7 @@ class LLM_dataset(Dataset):
                 # )
 
                 # batch_data = {
-                #     "input_ids": tokenized_batch.input_ids,
+                #     "input_ids": tokenized_without_prompt.input_ids,
                 #     "hidden_states": batch_last_hidden_state
                 # }
                 # torch.save(batch_data, self.save_embedding_path / "hidden_states" / f"batch_{epoch}.pt")
@@ -191,9 +209,9 @@ class LLM_dataset(Dataset):
                 )
                         
                 # Explicitly delete tensors and clear cache
-                del batch_with_prompt, tokenized_batch_with_chat_template, tokenized_prompt_batch, output
-                # , batch_last_hidden_state
+                del tokenized_without_prompt, batch_with_prompt, tokenized_batch_with_chat_template, tokenized_prompt_batch, output, sequences_to_decode
                 torch.cuda.empty_cache()
+                gc.collect()
 
                 epoch += 1
 

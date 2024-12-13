@@ -7,7 +7,7 @@ import torch
 class Sentence_Embedding_model(nn.Module):
     def __init__(self, embedding_dim: int = 718, sequence_length:int = 10, model_type:str ="mean", device:torch.cuda.device = None):
         super(Sentence_Embedding_model, self).__init__()
-
+        self.model_type = model_type
         if model_type == "mean":
             self.model = MeanMapping()
         elif model_type == "linear":
@@ -17,12 +17,23 @@ class Sentence_Embedding_model(nn.Module):
         elif model_type == "self-attention":
             self.model = MultiheadAttentionMapping(embedding_dim, num_heads=4)
         else: 
-            print("Will try to find a sentence embedding model")
+            print("Will try to find a sentence embedding model - ",model_type)
             self.model = SentenceTransformer(model_type, device=device)   # dim 768
-
+            print("That model was found!")
     
-    def forward(self,x):
-        return self.model(x) 
+    def forward(self, x, mode="last_hidden_layer"):
+        if mode == "last_hidden_layer":
+            if self.model_type == "sentence-t5-base":
+                print(x.shape)
+                print(self.model)
+                for i in range(1,4):
+                    print(x.shape)
+                    x=self.model[i](x)
+                return x
+            else:
+                return self.model(x) 
+        else:
+            self.model.encode(x)
 
 class MeanMapping(nn.Module):
     def __init__(self):
