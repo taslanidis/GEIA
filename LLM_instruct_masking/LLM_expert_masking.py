@@ -7,22 +7,49 @@ from datasets import load_dataset  # Import the datasets library
 from tqdm import tqdm  # Import tqdm for progress visualization
 from torch.utils.data import DataLoader  # Import DataLoader for batching
 
+# Enable CuDNN benchmarking for optimized performance
+torch.backends.cudnn.benchmark = True
+
 SCRATCH_DIR = os.path.join("/scratch-shared", os.getenv("USER"))
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # Set the GPU number. If inference with multiple GPUs, set multiple GPU numbers
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Define the system prompt for text-to-video (t2v) conversion
 sys_prompt = """
-You are part of a team of bots tasked with obfuscating sensitive information in text while preserving its overall structure and meaning. Your role is to identify sensitive tokens, such as named entities (e.g., names, locations, and organizations), and replace them with appropriate placeholders. The approach should mirror the techniques used in redacting classified CIA documents, ensuring clarity and security.
+You are part of a team of bots with two tasks:
+1. Obfuscating sensitive information in text while preserving its overall structure and meaning
+2. Creating alternative versions by replacing sensitive information with similar but different entities
 
-Rules:
-1. **Sensitive Entities**: These include names, locations, and other identifiable information that could compromise privacy.
-2. **Masking Format**: Replace sensitive entities with generic placeholders, such as `<NAME>`, `<LOCATION>`, `<YEAR>`, `<ENTITY>`, etc., depending on the context.
-3. **Preservation of Context**: Ensure that the resulting text is still grammatically correct and retains its original meaning as much as possible.
-4. **Consistency**: Use the same placeholder for identical sensitive entities within a single sequence.
-5. **Edge Cases**: If no sensitive entities are found, output the sequence unchanged.
+For each input text, you should provide TWO outputs separated by [SEP]:
+- First output: Masked version using placeholders (e.g., <NAME>, <LOCATION>)
+- Second output: Alternative version replacing sensitive entities with different but contextually similar entities
 
-Respond only with the processed sequences when handling user inputs.
+Rules for masking:
+1. Replace sensitive entities (names, locations, organizations) with appropriate placeholders
+2. Use format like <NAME>, <LOCATION>, <YEAR>, <ENTITY>
+3. Maintain grammatical correctness and original meaning
+4. Use consistent placeholders for identical entities
+5. If no sensitive entities exist, output unchanged text
+
+Rules for alternative version:
+1. Replace sensitive entities with different but plausible alternatives
+2. Maintain the same grammatical structure and coherence
+3. Ensure replacements are of the same category (e.g., replace person with person, city with city)
+4. The alternative should be semantically valid but change the meaning
+
+Example 1:
+Input: "Barack Obama visited the United Nations headquarters in New York"
+Masked version: <PERSON> visited the United Nations headquarters in <LOCATION>[SEP]Alternative version: Lebron James visited the United Nations headquarters in Los Angeles
+
+Example 2:
+Input: "Elon Musk is the CEO of SpaceX, based in Hawthorne, California"
+Masked version: <PERSON> is the CEO of <ORGANIZATION>, based in <LOCATION>[SEP]Alternative version: Sam Altman is the CEO of OpenAI, based in San Francisco
+
+Example 3:
+Input: "The CEO of Tesla, Elon Musk, met with the President of the United States"
+Masked version: The CEO of [[ORGANIZATION]], [[PERSON]], met with the President of the United States[SEP]Alternative version: The CEO of Meta, Mark Zuckerberg, met with the Prime Minister of the United Kingdom
+
+Please respond with: Masked version[SEP]Alternative version.
 """
 
 def mask_passage_batch(prompts: list, model, tokenizer, do_sample: bool, max_length: int, temperature: float = 0.7, top_p: float = 0.9):
@@ -30,7 +57,7 @@ def mask_passage_batch(prompts: list, model, tokenizer, do_sample: bool, max_len
     messages = [
         [
             {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": f'Please identify and mask all sensitive entities in the following passage: "{prompt}". Please leave only one less informative/sensitive information related to an entity unmasked.'}
+            {"role": "user", "content": f'Please provide both masked and alternative versions for the following text: "{prompt}"'}
         ] for prompt in prompts
     ]
     
@@ -42,15 +69,16 @@ def mask_passage_batch(prompts: list, model, tokenizer, do_sample: bool, max_len
         return_tensors=None,  # Avoid returning PyTorch tensors for compatibility
         return_dict=True
     )
-    inputs_list = inputs.to(device)  # Move the entire batch to device
-
+    
+    inputs_list = inputs.to(device)
+    
     # Pad the inputs to ensure consistent dimensions
     padded_inputs = tokenizer.pad(
-        inputs_list,
+        {"input_ids": inputs_list["input_ids"], "attention_mask": inputs_list["attention_mask"]},
         padding=True,  # Add padding to the shorter sequences
         return_tensors="pt"  # Convert the padded sequences to PyTorch tensors
     ).to(device)
-
+    
     # Set generation parameters
     gen_kwargs = {
         "max_length": max_length,
@@ -58,13 +86,29 @@ def mask_passage_batch(prompts: list, model, tokenizer, do_sample: bool, max_len
         "top_k": 1,
     }
     with torch.no_grad():
-        outputs = model.generate(**padded_inputs, **gen_kwargs)
-        outputs = outputs[:, padded_inputs['input_ids'].shape[1] + 1:]
-        generated_txts = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        print(generated_txts[0])
-    return generated_txts
-
-
+        outputs = model.generate(
+            input_ids=padded_inputs['input_ids'],
+            attention_mask=padded_inputs['attention_mask'],
+            **gen_kwargs
+        )
+        
+        generated_txts = tokenizer.batch_decode(outputs[:, padded_inputs['input_ids'].shape[1]+1:], skip_special_tokens=True)
+        
+        # Split the outputs into masked and alternative versions
+        processed_outputs = []
+        for txt in generated_txts:
+            versions = txt.split('[SEP]')
+            if len(versions) == 2:
+                processed_outputs.append({
+                    'masked': versions[0].strip().replace('Masked version:', '').strip(),
+                    'alternative': versions[1].strip().replace('Alternative version:', '').strip()
+                })
+            else:
+                processed_outputs.append({
+                    'masked': txt.strip(),
+                    'alternative': txt.strip()
+                })
+    return processed_outputs
 
 if __name__ == "__main__":
     # Argument parser for user input
@@ -74,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_length", type=int, default=2500, help="Maximum length of the generated description")
     parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature for generation")
     parser.add_argument("--top_p", type=float, default=0.9, help="Nucleus sampling parameter")
-    parser.add_argument("--log_file", type=str, default='output.json', help="Path to the log file for entries")
+    parser.add_argument("--log_file", type=str, default='output.jsonl', help="Path to the log file for entries")
     args = parser.parse_args()
 
     # Load the dataset
@@ -90,32 +134,45 @@ if __name__ == "__main__":
         trust_remote_code=True,
         device_map="auto"
     ).eval()
-
-    # Create a DataLoader for batching
-    batch_size = 128  # Adjust batch size as needed
+    
+    # Create a DataLoader for batching with increased workers and prefetching
+    batch_size = 512  # Adjust batch size as needed
     data_loader = DataLoader(
-    dataset['train'], 
-    batch_size=batch_size, 
-    shuffle=False, 
-    pin_memory=True, 
-    num_workers=4  # Adjust based on your system
+        dataset['train'], 
+        batch_size=batch_size, 
+        shuffle=False, 
+        pin_memory=True, 
+        num_workers=16,  # Increased from 8 to 16
+        prefetch_factor=4  # Added prefetching
     )
 
     # Open the log file for writing outside the loop
     with open(args.log_file, 'w', encoding='utf-8') as f:
         # Iterate over the dataset in batches
-        for batch in tqdm(data_loader, desc="Processing batches"):
-            prompts = [sentence for sentence in batch['simplified']]  # Get the original texts
-            masked_txts = mask_passage_batch(prompts, model, tokenizer, do_sample=True, max_length=args.max_length, temperature=args.temperature, top_p=args.top_p)
+        for idx, batch in tqdm(enumerate(data_loader), desc="Processing batches"):
+            if idx < 2:
+                prompts = [sentence for sentence in batch['simplified']]  # Get the original texts
+                processed_outputs = mask_passage_batch(
+                    prompts, 
+                    model, 
+                    tokenizer, 
+                    do_sample=True, 
+                    max_length=args.max_length, 
+                    temperature=args.temperature, 
+                    top_p=args.top_p
+                )
 
-            # Log the original and generated texts in JSON format
-            for original_txt, masked_txt in zip(batch['simplified'], masked_txts):
-                log_entry = {
-                    "original": original_txt,
-                    "masked": masked_txt
-                }
-                json.dump(log_entry, f, ensure_ascii=False)
-                f.write('\n')  # Write a newline for each entry to separate them
+                # Log the original and generated texts in JSON format
+                for original_txt, processed in zip(batch['simplified'], processed_outputs):
+                    log_entry = {
+                        "original": original_txt,
+                        "masked": processed['masked'],
+                        "alternative": processed['alternative']
+                    }
+                    json.dump(log_entry, f, ensure_ascii=False)
+                    f.write('\n')  # Write a newline for each entry to separate them
+            else:
+                break
 
-#example usage
+# Example usage
 # python LLM_expert_masking.py
