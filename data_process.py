@@ -4,6 +4,8 @@ from pprint import pprint
 import config
 import json
 import sys
+import re
+
 
 abcd_path = config.abcd_path
 
@@ -14,13 +16,28 @@ list of supported datasets:
 
 
 def get_extension_data(path: str):
-    
-    with open(path, 'r') as f:
-        data = json.load(f)
 
-    original = [s['original'] for s in data]
-    masked = [s['masked'] for s in data]
-    similar = [s['similar'] for s in data]
+    data = []
+    with open(path, 'r') as f:
+        for line in f:
+            data.append(json.loads(line))
+
+    original = []
+    masked = []
+    similar = []
+
+    for s in data:
+       # Skip samples containing any tag like '<LOCATION>', '<DATE>', '<ENTITY>'
+        if re.search(r'<[A-Z]+>', s['alternative']):
+            continue  # skip this sample
+
+        masked_sentence = re.sub(r'<[A-Z]+>', '<mask>', s['masked'])
+        masked_sentence = masked_sentence.replace("Masked version:", "").strip()
+        print(f'Masked: {s["masked"]}\nProcessed masked: {masked_sentence}')
+        original.append(s['original'])
+        masked.append(masked_sentence)
+        alternative_sentence = s['alternative'].replace("Alternative version:", "").strip()
+        similar.append(alternative_sentence)
 
     return original, masked, similar
 
