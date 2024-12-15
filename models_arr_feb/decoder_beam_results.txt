@@ -1,3 +1,4 @@
+
 2024-11-13 15:46:52,037 - INFO -  =====/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log=====
 2024-11-13 15:48:51,355 - INFO -  micro precision_score on token level: 0.5664042725523944
 2024-11-13 15:48:51,356 - INFO -  micro recall_score on token level: 0.4941509006895257

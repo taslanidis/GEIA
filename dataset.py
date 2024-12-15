@@ -2,7 +2,8 @@ import json
 import torch
 from tqdm import tqdm
 from pathlib import Path
-from datasets import DatasetDict, Dataset
+from datasets import DatasetDict, Dataset as Dataset_datasets
+from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import gc
 
@@ -89,6 +90,9 @@ class LLM_dataset(Dataset):
     def __getitem__(self, idx):
         return self.text[idx], self.mapping[self.text[idx]]
 
+    def convert_to_dataset_dict(self):
+        return Dataset_datasets.from_dict({"input_LLM": list(self.mapping.keys()),"output_LLM": list(self.mapping.values()) })
+
     def collate(self, batch_input):
         LLM_output = batch_input[1]
         if self.last_hidden_states_flag:
@@ -122,10 +126,10 @@ class LLM_dataset(Dataset):
 
         with torch.no_grad():
             sys_prompt = "The following is a friendly conversation between a human and an AI. The response of the AI is single, thoughtful, enthusiastic and engaging sentence that builds meaningfully on what the human said, adds depth to the conversation, and invites further dialogue with the human. If the AI does not know the answer to a question, it truthfully says it does not know. Your task is to just output the response of the AI not the human as well. Current conversation:"
-            epoch = 0
+            # epoch = 0
             for batch in tqdm(dataloader, desc="Generating embeddings"):
                 flag= False
-                print("EPOCH",epoch)
+                # print("EPOCH",epoch)
                 # for i in batch:
                 #     if len(i)>=2000:
                 #         print("LEN[i]",len(i))
@@ -210,7 +214,7 @@ class LLM_dataset(Dataset):
                 torch.cuda.empty_cache()
                 gc.collect()
 
-                epoch += 1
+                # epoch += 1
 
             json.dump(
                 output_text, open(self.save_embedding_path / "output_text.json", "w")

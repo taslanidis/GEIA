@@ -5,8 +5,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=04:00:00
-#SBATCH --job-name=LLM_train_LLM3_personachat_sent_roberta
-#SBATCH --output=./output/%x-%j.out
+#SBATCH --job-name=train_LLM3_personachat_sent-t5_5porcent
+#SBATCH --output=./output/final/%x-%j.out
 
 # entire script fails if a single command fails
 set -e
@@ -22,11 +22,16 @@ source activate $ENV_PREFIX
 
 python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('CUDA device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No CUDA device')"
 
-# fingpt     llama2     sent-t5   
-python attacker_to_LLM_output.py --data_type train --sentence_aggregation sentence-t5-base --batch_size 16 --num_epochs 10 --percentage_of_dataset 100 --dataset fingpt-sentiment --embed_model meta-llama2-7b
+# fingpt     llama2     sent-t5             jobname=train_LLM2_fingpt_sent-t5_100porcent
+# python attacker_to_LLM_output.py --data_type train --sentence_aggregation sentence-t5-base --batch_size 16 --num_epochs 10 --percentage_of_dataset 5 --dataset fingpt-sentiment --embed_model meta-llama2-7b --save_embedding ./LLM_hidden_states/
 
-# fingpt     llama2      sent-roberta
-# python attacker_to_LLM_output.py --data_type train --sentence_aggregation sent_roberta --batch_size 16 --num_epochs 10 --percentage_of_dataset 100 --dataset fingpt-sentiment --embed_model meta-llama2-7b --save_embedding ./LLM_hidden_states2/
+# fingpt     llama2      sent-roberta       jobname=train_LLM2_fingpt_sent-roberta_100porcent
+# python attacker_to_LLM_output.py --data_type train --sentence_aggregation sent_roberta --batch_size 16 --num_epochs 10 --percentage_of_dataset 100 --dataset fingpt-sentiment --embed_model meta-llama2-7b --save_embedding ./LLM_hidden_states/
 
-# personachat       llama3      sent-t5
-# python attacker_to_LLM_output.py --data_type train --sentence_aggregation sentence-t5-base --batch_size 16 --num_epochs 10 --percentage_of_dataset 100 --dataset fingpt-sentiment --embed_model meta-llama2-7b
+# ---------------------------------------------------
+
+# personachat       llama3      sent-t5         jobname= train_LLM3_personachat_sent-t5_100porcent
+python attacker_to_LLM_output.py --data_type train --sentence_aggregation sentence-t5-base --batch_size 16 --num_epochs 10 --percentage_of_dataset 5 --dataset personachat --embed_model meta-llama --save_embedding ./LLM_hidden_states/
+
+# personachat       llama3      sent-roberta        jobname=train_LLM3_personachat_sent-roberta_100porcent
+# python attacker_to_LLM_output.py --data_type train --sentence_aggregation sent_roberta --batch_size 16 --num_epochs 10 --percentage_of_dataset 100 --dataset personachat --embed_model meta-llama --save_embedding ./LLM_hidden_states/

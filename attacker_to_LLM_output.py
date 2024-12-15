@@ -54,6 +54,7 @@ def process_data(
     dataset: LLM_dataset,
     config: dict,
 ):
+    print("M - Loading data")
     dataloader = DataLoader(
         dataset=dataset,
         shuffle=True,
@@ -61,6 +62,7 @@ def process_data(
         collate_fn=dataset.collate,
     )
 
+    print("M - Loading Sentence_Embedding_model")
     # Sentence model - In the attacker schema
     sentence_embedding_model = Sentence_Embedding_model(
         model_type=config["sentence_aggregation"], device=config["device"]
