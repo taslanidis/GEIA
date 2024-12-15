@@ -2,7 +2,7 @@ import json
 import torch
 from tqdm import tqdm
 from pathlib import Path
-from torch.utils.data import Dataset, DataLoader
+from datasets import DatasetDict, Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import gc
 
@@ -87,16 +87,13 @@ class LLM_dataset(Dataset):
         return len(self.text)
 
     def __getitem__(self, idx):
-        return self.text[idx]
+        return self.text[idx], self.mapping[self.text[idx]]
 
     def collate(self, batch_input):
-        LLM_output = None
+        LLM_output = batch_input[1]
         if self.last_hidden_states_flag:
-            LLM_output = [self.mapping[text] for text in batch_input]
             LLM_output = torch.stack(LLM_output)
-        else:
-            LLM_output = [self.mapping[text] for text in batch_input]
-        return batch_input, LLM_output
+        return batch_input[0], LLM_output
 
     def create_dataset(self, dataset: Dataset, config: dict):
         model = AutoModelForCausalLM.from_pretrained(

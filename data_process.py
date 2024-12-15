@@ -56,7 +56,7 @@ def get_fingpt_sentiment_data(data_type):
     Processes the FinGPT sentiment dataset.
     """
     # Load the dataset from Hugging Face
-    dataset = load_dataset('FinGPT/fingpt-sentiment-train', cache_dir="data/", split="train")
+    dataset = load_dataset('FinGPT/fingpt-sentiment-train', split="train")
     dataset_size = len(dataset)
     split_20 = int(0.2 * dataset_size)
     split_80 = dataset_size - split_20

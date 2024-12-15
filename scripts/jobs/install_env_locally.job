@@ -33,9 +33,6 @@ pip install huggingface_hub==0.25.2
 pip install evaluate==0.4.3 # for evaluation on generation
 pip install editdistance==0.8.1 # for evaluation on generation
 pip install stanza==1.9.2 # for ner metric run
-pip install wandb
-pip install accelerate
-pip install jinja2
 pip install "numpy>=1.19.5,<1.20.0" pandas
 
 python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('CUDA device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No CUDA device')"

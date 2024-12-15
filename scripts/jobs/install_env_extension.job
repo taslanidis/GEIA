@@ -32,6 +32,9 @@ pip install gdown==5.2.0
 pip install huggingface_hub==0.25.2
 pip install evaluate==0.4.3 # for evaluation on generation
 pip install editdistance==0.8.1 # for evaluation on generation
+pip install wandb
+pip install accelerate
+pip install jinja2
 pip install "numpy>=1.19.5,<1.20.0" pandas
 pip install "numpy>=1.19.5,<1.20.0" matplotlib
 
