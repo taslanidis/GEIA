@@ -39,7 +39,7 @@ parser.add_argument(
     default=40,
     help="How many tokens should the LLM use to answer the prompt?",
 )
-parser.add_argument("--batch_size", type=int, default=16, help="Batch_size #.")
+parser.add_argument("--batch_size", type=int, default=64, help="Batch_size #.")
 parser.add_argument(
     "--dataset",
     type=str,
@@ -150,15 +150,20 @@ train_dataset: DatasetDict = the_LLM_dataset.convert_to_dataset_dict()
 teacher_model = SentenceTransformer(args.teacher_model)
 def get_teacher_output(batch):
     with torch.no_grad():
-        return {"label":teacher_model.encode(batch["output_LLM"])}
+        return {"label":teacher_model.encode(batch["input_LLM"])}
 
-train_dataset = train_dataset.map(get_teacher_output, batched=True, batch_size=args.batch_size)
+train_dataset = train_dataset.map(get_teacher_output, batched=True, batch_size=args.batch_size*4)
+del teacher_model 
+torch.cuda.empty_cache()
 
 # Load the model
 student_model = SentenceTransformer(args.student_model)
 
 # Define the train loss
 train_loss = losses.MSELoss(model=student_model)
+
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # 5. Specify training arguments
 args = SentenceTransformerTrainingArguments(
@@ -170,23 +175,23 @@ args = SentenceTransformerTrainingArguments(
     per_device_eval_batch_size=args.batch_size,
     learning_rate=2e-5,
     warmup_ratio=0.1,
-    fp16=True,  # Set to False if you get an error that your GPU can't run on FP16
-    bf16=False,  # Set to True if you have a GPU that supports BF16
+    fp16=torch.cuda.is_bf16_supported() == False,  # Enable fp16 if bf16 is not supported
+    bf16=torch.cuda.is_bf16_supported(),  # Enable bf16 only if supported
+    dataloader_num_workers=4,  # Increase DataLoader parallelism
+
     batch_sampler=BatchSamplers.NO_DUPLICATES,  # MultipleNegativesRankingLoss benefits from no duplicate samples in a batch
     # Optional tracking/debugging parameters:
-    eval_strategy="steps",
-    eval_steps=100,
-    save_strategy="steps",
-    save_steps=100,
-    save_total_limit=2,
-    logging_steps=100,
-    run_name="train",  # Will be used in W&B if `wandb` is installed
+    save_strategy="epoch",  # Save models only at the end of each epoch for efficiency
+    eval_strategy="no",  # Disable intermediate evaluation unless necessary
+    logging_steps=500,  # Reduce logging frequency
+    save_total_limit=1,  # Save only the most recent checkpoint
+    run_name="train",  # W&B run name
 )
 
 # 6. Create a trainer
 trainer = SentenceTransformerTrainer(
     model=student_model,
-    # args=args,
+    args=args,
     train_dataset=train_dataset,
     loss=train_loss,
 )
@@ -205,6 +210,7 @@ the_LLM_dataset: Dataset = LLM_dataset(the_original_dataset, config)
 
 test_dataset: DatasetDict = the_LLM_dataset.convert_to_dataset_dict()
 
+teacher_model = SentenceTransformer(args.teacher_model)
 # 9. Evaluate the model
 from sentence_transformers.evaluation import MSEEvaluator
 mse_evaluator = MSEEvaluator(

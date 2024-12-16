@@ -8,6 +8,8 @@ __pycache__/
 *.label
 
 # DATA
+tmp_trainer
+tmp_trainer/*
 data
 data.zip
 data/abcd/
