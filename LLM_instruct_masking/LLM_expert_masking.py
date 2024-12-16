@@ -100,14 +100,25 @@ def mask_passage_batch(prompts: list, model, tokenizer, do_sample: bool, max_len
             versions = txt.split('[SEP]')
             if len(versions) == 2:
                 processed_outputs.append({
-                    'masked': versions[0].strip().replace('Masked version:', '').strip(),
-                    'alternative': versions[1].strip().replace('Alternative version:', '').strip()
+                    'masked': versions[0].strip().replace('Masked version:', '').strip().replace('\n', ''),
+                    'alternative': versions[1].strip().replace('Alternative version:', '').strip().replace('\n', '')
                 })
             else:
-                processed_outputs.append({
-                    'masked': txt.strip(),
-                    'alternative': txt.strip()
-                })
+                # Handle case where [SEP] is not present but "Alternative version:" exists
+                versions = txt.split('Alternative version:')
+                if len(versions) == 2:
+                    processed_outputs.append({
+                        'masked': versions[0].strip().replace('Masked version:', '').strip().replace('\n', ''),
+                        'alternative': versions[1].strip().replace('\n', ' ')
+                    })
+                else:
+                    # If neither delimiter is found, add the entire text as masked version
+                    processed_outputs.append({
+                        'masked': txt.strip().replace('\n', ''),
+                        'alternative': ''  # Empty string for alternative if not found
+                    })
+            
+            
     return processed_outputs
 
 if __name__ == "__main__":
@@ -116,9 +127,10 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_name", type=str, default='sentence-transformers/altlex', help="Name of the dataset to use")
     parser.add_argument("--model_path", type=str, default='GLM-4/glm-4-9b-chat', help="Path to the pre-trained Llama-3 model")
     parser.add_argument("--max_length", type=int, default=2500, help="Maximum length of the generated description")
+    parser.add_argument("--batch_size", type=int, default=1024, help="Batch size for processing")
     parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature for generation")
     parser.add_argument("--top_p", type=float, default=0.9, help="Nucleus sampling parameter")
-    parser.add_argument("--log_file", type=str, default='output.jsonl', help="Path to the log file for entries")
+    parser.add_argument("--num_iterations", type=int, default=40, help="Number of iterations to process")
     args = parser.parse_args()
 
     # Load the dataset
@@ -136,21 +148,24 @@ if __name__ == "__main__":
     ).eval()
     
     # Create a DataLoader for batching with increased workers and prefetching
-    batch_size = 512  # Adjust batch size as needed
+    batch_size = args.batch_size  # Adjust batch size as needed
     data_loader = DataLoader(
         dataset['train'], 
         batch_size=batch_size, 
         shuffle=False, 
         pin_memory=True, 
-        num_workers=16,  # Increased from 8 to 16
-        prefetch_factor=4  # Added prefetching
+        num_workers=4,
     )
 
     # Open the log file for writing outside the loop
-    with open(args.log_file, 'w', encoding='utf-8') as f:
+    log_file = f'{batch_size}_{args.num_iterations}_second_half_iterations.jsonl'
+    with open(log_file, 'w', encoding='utf-8') as f:
         # Iterate over the dataset in batches
         for idx, batch in tqdm(enumerate(data_loader), desc="Processing batches"):
-            if idx < 2:
+            if idx > args.num_iterations and idx < 2 * args.num_iterations:
+                if idx % 5 == 0 and idx != 0: 
+                    torch.cuda.empty_cache()  # Clear cache every five iterations
+                
                 prompts = [sentence for sentence in batch['simplified']]  # Get the original texts
                 processed_outputs = mask_passage_batch(
                     prompts, 
@@ -171,7 +186,7 @@ if __name__ == "__main__":
                     }
                     json.dump(log_entry, f, ensure_ascii=False)
                     f.write('\n')  # Write a newline for each entry to separate them
-            else:
+            if idx >= 2 * args.num_iterations:
                 break
 
 # Example usage

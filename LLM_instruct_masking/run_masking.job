@@ -5,8 +5,8 @@
 #SBATCH --job-name=run_masking
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=02:30:00
-#SBATCH --output=./logs/run_masking-%A.out
+#SBATCH --time=06:00:00
+#SBATCH --output=./logs/run_masking-batch_size_128_40_second_half_iterations-%A.out
 
 # entire script fails if a single command fails
 set -e
@@ -21,4 +21,4 @@ ENV_PREFIX="$PROJECT_DIR"/.env
 
 source activate $ENV_PREFIX
 
-python LLM_expert_masking.py
+python LLM_expert_masking.py --batch_size 128 --num_iterations 40
