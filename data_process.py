@@ -32,8 +32,9 @@ def get_extension_data(path: str):
             continue  # skip this sample
 
         masked_sentence = re.sub(r'<[A-Z]+>', '<mask>', s['masked'])
+        masked_sentence = re.sub(r'^assistant', '', masked_sentence)
         masked_sentence = masked_sentence.replace("Masked version:", "").strip()
-        print(f'Masked: {s["masked"]}\nProcessed masked: {masked_sentence}')
+        # print(f'Masked: {s["masked"]}\nProcessed masked: {masked_sentence}')
         original.append(s['original'])
         masked.append(masked_sentence)
         alternative_sentence = s['alternative'].replace("Alternative version:", "").strip()

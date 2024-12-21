@@ -5,7 +5,7 @@
 #SBATCH --job-name=detect_leakage
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=00:40:00
+#SBATCH --time=00:59:00
 #SBATCH --output=./output/%x-%j.out
 
 # entire script fails if a single command fails
@@ -22,4 +22,21 @@ source activate $ENV_PREFIX
 
 python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('CUDA device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No CUDA device')"
 
-python detect_training_leakage.py --dataset_path LLM_instruct_masking/output.jsonl
+# victim: sent roberta
+python detect_training_leakage.py --dataset_path LLM_instruct_masking/output_10k_rows.jsonl
+
+python detect_training_leakage.py --dataset_path LLM_instruct_masking/output_10k_rows.jsonl --exclude_sentence_emb
+
+python detect_training_leakage.py --dataset_path LLM_instruct_masking/llama_masking-128_80_iterations.jsonl
+
+python detect_training_leakage.py --dataset_path LLM_instruct_masking/llama_masking-128_80_iterations.jsonl --exclude_sentence_emb
+
+# victim: simcse bert
+python detect_training_leakage.py --embed_model simcse_bert --dataset_path LLM_instruct_masking/output_10k_rows.jsonl
+
+python detect_training_leakage.py --embed_model simcse_bert --dataset_path LLM_instruct_masking/output_10k_rows.jsonl --exclude_sentence_emb
+
+python detect_training_leakage.py --embed_model simcse_bert --dataset_path LLM_instruct_masking/llama_masking-128_80_iterations.jsonl
+
+python detect_training_leakage.py --embed_model simcse_bert --dataset_path LLM_instruct_masking/llama_masking-128_80_iterations.jsonl --exclude_sentence_emb
+

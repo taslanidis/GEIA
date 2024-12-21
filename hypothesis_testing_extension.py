@@ -1,14 +1,11 @@
 import json
+import os
 import numpy as np
 from scipy import stats
 
 
-if __name__ == "__main__":
-
-    # probs GEIA
-    with open("./logs/leakage_attacker_rand_gpt2_m_personachat_sent_roberta_beam.log") as f:
-        probs = json.load(f)
-
+def run_t_test(probs: dict) -> None:
+     
     original_mean = np.mean(probs["positive_sample_likelihood"])
     negative_mean = np.mean(probs["negative_sample_likelihood"])
     original_std = np.std(probs["positive_sample_likelihood"])
@@ -22,6 +19,25 @@ if __name__ == "__main__":
     # Interpret the results
     alpha = 0.05
     if p_value < alpha:
-            print("Reject the null hypothesis; there is a significant difference between the distributions.")
+            print(f"Stat Sig difference in distributions (p_value={p_value}).")
     else:
-        print("Fail to reject the null hypothesis; there is no significant difference between the distributions.")
+        print(f"No stat sig difference in dsitributions (p_value={p_value})")
+
+
+
+if __name__ == "__main__":
+
+    log_folder: str = "./logs"
+    # Iterate over all files in the folder starting with 'leakage_'
+    for file_name in os.listdir(log_folder):
+        if file_name.startswith("leakage_") and file_name.endswith(".log"):
+            file_path = os.path.join(log_folder, file_name)
+
+            # Read and process the log file
+            with open(file_path) as f:
+                probs = json.load(f)
+
+            print("----------------------------")
+            print(f"Running t-tests for file: {file_name}")
+            run_t_test(probs)
+            print("-----------------------------")

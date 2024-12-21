@@ -56,13 +56,13 @@ def eval_ll(
     sentence_embeddings_from_mask = sentence_embeddings_from_mask.to(device)
 
     # Tokenize positive and negative texts
-    positive_inputs = tokenizer(positive_sample_text, return_tensors="pt", padding=True).to(device)
-    negative_inputs = tokenizer(negative_sample_text, return_tensors="pt", padding=True).to(device)
+    positive_inputs = tokenizer(positive_sample_text, max_length=256, truncation=True, return_tensors="pt", padding=True).to(device)
+    negative_inputs = tokenizer(negative_sample_text, max_length=256, truncation=True, return_tensors="pt", padding=True).to(device)
 
     sentence_embeddings = sentence_embeddings_from_mask.unsqueeze(1).to(device)
 
     # Compute log-likelihood for positive and negative samples
-    def compute_log_likelihood(inputs):
+    def compute_log_likelihood(inputs, include_sentence_emb: bool = True):
         with torch.no_grad():
             labels = inputs['input_ids']
             input_ids = inputs['input_ids']
@@ -71,7 +71,10 @@ def eval_ll(
             print("Emb size: ", embeddings.size())
             print("Sent from mask: ", sentence_embeddings.size())
             # Concatenate token embeddings with expanded sentence embeddings
-            inputs_embeds = torch.cat([embeddings, sentence_embeddings], dim=1)
+            if include_sentence_emb:
+                inputs_embeds = torch.cat([sentence_embeddings, embeddings], dim=1)
+            else:
+                inputs_embeds = embeddings
 
             outputs = model(
                 inputs_embeds=inputs_embeds
@@ -87,8 +90,8 @@ def eval_ll(
             sequence_log_prob = token_log_probs.sum(dim=-1)  # Sum over tokens
         return sequence_log_prob
 
-    pos_ll = compute_log_likelihood(positive_inputs)
-    neg_ll = compute_log_likelihood(negative_inputs)
+    pos_ll = compute_log_likelihood(positive_inputs, include_sentence_emb=config['include_sentence_emb'])
+    neg_ll = compute_log_likelihood(negative_inputs, include_sentence_emb=config['include_sentence_emb'])
 
     return pos_ll.cpu().tolist(), neg_ll.cpu().tolist()
 
@@ -105,9 +108,9 @@ def calculate_leakage(
     sentence_model = SentenceTransformer(config['embed_model_path'], device=device)
 
     if(config['decode'] == 'beam'):
-        save_path = "logs/leakage_" + config['attacker_save_name'] + '_beam.log'
+        save_path = f"logs/leakage_{config['llm']}_{config['include_sentence_emb']}_{config['attacker_save_name']}_beam.log"
     else:
-        save_path = "logs/leakage_" + config['attacker_save_name'] + '.log'
+        save_path = f"logs/leakage_{config['llm']}_{config['include_sentence_emb']}_{config['attacker_save_name']}.log"
     
     original_data = ExtensionData(original_sent_list)
     masked_data = ExtensionData(masked_sent_list)
@@ -185,10 +188,22 @@ def calculate_leakage(
 
 if __name__ == '__main__':
     
+    model_cards = {}
+    model_cards['sent_t5_large'] = 'sentence-t5-large'
+    model_cards['sent_t5_base'] = 'sentence-t5-base'
+    model_cards['sent_t5_xl'] = 'sentence-t5-xl'
+    model_cards['sent_t5_xxl'] = 'sentence-t5-xxl'
+    model_cards['mpnet'] = 'all-mpnet-base-v1'
+    model_cards['sent_roberta'] = 'all-roberta-large-v1'
+    model_cards['simcse_bert'] = 'princeton-nlp/sup-simcse-bert-large-uncased'
+    model_cards['simcse_roberta'] = 'princeton-nlp/sup-simcse-roberta-large'
+
     parser = argparse.ArgumentParser(description='Training external NN as baselines')
     parser.add_argument('--model_dir', type=str, default='random_gpt2_medium', help='Dir of your model')
     parser.add_argument('--num_epochs', type=int, default=10, help='Training epoches.')
+    parser.add_argument('--exclude_sentence_emb', action="store_false")
     parser.add_argument('--batch_size', type=int, default=16, help='Batch_size #.')
+    parser.add_argument('--embed_model', type=str, default='sent_roberta', help='Name of embedding model: mpnet/sent_roberta/simcse_bert/simcse_roberta/sent_t5')
     parser.add_argument('--dataset_path', type=str, default='./data/test.jsonl', help='Path for the processed SNLI dataset.')
     parser.add_argument('--decode', type=str, default='beam', help='Name of decoding methods: beam/sampling')
     args = parser.parse_args()
@@ -198,10 +213,11 @@ if __name__ == '__main__':
     config['batch_size'] = args.batch_size
     config['dataset_path'] = args.dataset_path
     config['dataset'] = 'extension'
+    config['llm'] = 'llama3' if args.dataset_path.find('llama') != -1 else 'glm4'
     config['decode'] = args.decode
     # victim model
-    config['embed_model'] = 'sent_roberta'
-    config['embed_model_path'] = 'all-roberta-large-v1'
+    config['embed_model'] = args.embed_model
+    config['embed_model_path'] = model_cards[config['embed_model']]
     config['pretrained_geia_dataset'] = 'personachat'
     # custom save paths
     attacker_model: str = "rand_gpt2_m" if args.model_dir == "random_gpt2_medium" else "dialogpt2"
@@ -211,6 +227,9 @@ if __name__ == '__main__':
     config['projection_save_path'] = f"models/{projection_save_name}"
     config['attacker_save_name'] = attacker_save_name
     config['projection_save_name'] = projection_save_name
+
+    include_sentence_emb = not args.exclude_sentence_emb
+    config['include_sentence_emb'] = include_sentence_emb
 
     if torch.cuda.is_available():
         config['device'] = torch.device("cuda")
