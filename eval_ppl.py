@@ -223,21 +223,26 @@ if __name__ == '__main__':
     # print('===simcse_roberta===')
     # get_val_ppl(simcse_roberta_large_pc_path,batch_size,device,config)
 
-    # Our run    
-    first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
-    second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
-    third = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log"
-    # "logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
-    forth =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log"
-    fith = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log"
-    # "logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
-    six = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log"
-    seven =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log"
-    eight =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log"
-    nine =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log"
-    ten =   "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log"
+    # # Our run    
+    # first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    # second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    # third = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_mpnet_beam.log"
+    # # "logs/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
+    # forth =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_sent_t5_base_beam.log"
+    # fith = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_personachat_simcse_roberta_beam.log"
+    # # "logs/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    # six = "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_mpnet_beam.log"
+    # seven =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_roberta_beam.log"
+    # eight =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_sent_t5_base_beam.log"
+    # nine =  "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_bert_beam.log"
+    # ten =   "/home/marina/GEIA/logs/attacker_rand_gpt2_m_qnli_simcse_roberta_beam.log"
 
-    path_list = [first, second, third, forth, fith, six, seven, eight, nine, ten]
+    # path_list = [first, second, third, forth, fith, six, seven, eight, nine, ten]
+    
+    first = "/home/scur1682/GEIA/logs/attacker_dialogpt2_fingpt-sentiment_meta-llama2-7b_all-roberta-large-v1_40_beam.log"
+    second = "/home/scur1682/GEIA/logs/attacker_dialogpt2_fingpt-sentiment_meta-llama2-7b_sentence-t5-base_40_beam.log"
+
+    path_list = [first, second]
     for p in path_list:
         print(f'==={p}===')
         get_val_ppl(p,batch_size,device,config)
