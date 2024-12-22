@@ -5,7 +5,7 @@
 #SBATCH --job-name=detect_leakage
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=00:59:00
+#SBATCH --time=02:59:00
 #SBATCH --output=./output/%x-%j.out
 
 # entire script fails if a single command fails
