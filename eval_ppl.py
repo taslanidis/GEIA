@@ -94,7 +94,7 @@ def process_data(data,batch_size,device,config,need_porj=False):
     if need_porj:
         projection = linear_projection(in_num=768).to(device)
     ### for attackers
-    model_attacker = AutoModelForCausalLM.from_pretrained('dialogpt_qnli')
+    model_attacker = AutoModelForCausalLM.from_pretrained('microsoft/DialoGPT-medium')
     tokenizer_attacker = AutoTokenizer.from_pretrained(config['model_dir'])
     criterion = SequenceCrossEntropyLoss()
     model_attacker.to(device)
@@ -207,26 +207,19 @@ if __name__ == '__main__':
 
     
     ### qnli with beam search decoding
-    sbert_roberta_large_pc_path  =  '../models_random/attacker_gpt2_qnli_sent_roberta.log'
-    simcse_roberta_large_pc_path  = '../models_random/attacker_gpt2_qnli_simcse_roberta.log'
-    simcse_bert_large_pc_path = '../models_random/attacker_gpt2_qnli_simcse_bert.log' 
-    sentence_T5_large_pc_path = '../models_random/attacker_gpt2_qnli_sent_t5.log' 
-    mpnet_pc_path = '../models_random/attacker_gpt2_qnli_mpnet.log'
+    # sbert_roberta_large_pc_path  =  '../models_random/attacker_gpt2_qnli_sent_roberta.log'
+    # simcse_roberta_large_pc_path  = '../models_random/attacker_gpt2_qnli_simcse_roberta.log'
+    # simcse_bert_large_pc_path = '../models_random/attacker_gpt2_qnli_simcse_bert.log' 
+    # sentence_T5_large_pc_path = '../models_random/attacker_gpt2_qnli_sent_t5.log' 
+    # mpnet_pc_path = '../models_random/attacker_gpt2_qnli_mpnet.log'
     
-    first = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_sent_roberta_beam.log"
-    second = "/home/marina/GEIA/attacker_rand_gpt2_m_personachat_simcse_bert_beam.log"
+    first = "/home/marina/GEIA/attacker_dialogpt2_fingpt-sentiment_meta-llama2-7b_all-roberta-large-v1_40_beam.log"
+    second = "/home/marina/GEIA/attacker_dialogpt2_fingpt-sentiment_meta-llama2-7b_sentence-t5-base_40_beam.log"
+    three = "/home/marina/GEIA/attacker_dialogpt2_personachat_meta-llama_all-roberta-large-v1_40_beam.log"
+    four = "/home/marina/GEIA/attacker_dialogpt2_personachat_meta-llama_sentence-t5-base_40_beam.log"
 
-    path_list = [first, second]
-    
-    print('===mpnet===')
-    get_val_ppl(mpnet_pc_path,batch_size,device,config)
-    print('===sen_roberta===')
-    get_val_ppl(sbert_roberta_large_pc_path,batch_size,device,config)
-    print('===st5===')
-    get_val_ppl(sentence_T5_large_pc_path,batch_size,device,config)
-    print('===simcse_bert===')
-    get_val_ppl(simcse_bert_large_pc_path,batch_size,device,config)
-    print('===simcse_roberta===')
-    get_val_ppl(simcse_roberta_large_pc_path,batch_size,device,config)
-
+    path_list = [first, second, three, four]
+    for p in path_list:
+        print(f'==={p}===')
+        get_val_ppl(p,batch_size,device,config)
 
