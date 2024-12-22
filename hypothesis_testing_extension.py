@@ -6,15 +6,19 @@ from scipy import stats
 
 def run_t_test(probs: dict) -> None:
      
-    original_mean = np.mean(probs["positive_sample_likelihood"])
-    negative_mean = np.mean(probs["negative_sample_likelihood"])
-    original_std = np.std(probs["positive_sample_likelihood"])
-    negative_std = np.std(probs["negative_sample_likelihood"])
+    original_mean = np.nanmean(probs["positive_sample_likelihood"])
+    negative_mean = np.nanmean(probs["negative_sample_likelihood"])
+    original_std = np.nanstd(probs["positive_sample_likelihood"])
+    negative_std = np.nanstd(probs["negative_sample_likelihood"])
 
     print(f"Original mean: {original_mean} with std: {original_std}\nNegative mean: {negative_mean} with std: {negative_std}")
 
     # Perform the t-test
-    t_stat, p_value = stats.ttest_ind(probs["positive_sample_likelihood"], probs["negative_sample_likelihood"])
+    t_stat, p_value = stats.ttest_ind(
+        probs["positive_sample_likelihood"], 
+        probs["negative_sample_likelihood"], 
+        nan_policy='omit'
+    )
 
     # Interpret the results
     alpha = 0.05

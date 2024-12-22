@@ -39,6 +39,113 @@ class ExtensionData(Dataset):
         return unpacked_data
 
 
+def compute_log_likelihood_over_masked(
+        inputs, 
+        model,
+        sentence_embeddings,
+        masked_token_indices,
+        include_sentence_emb: bool = True
+):
+    """
+    Compute log-likelihood over masked tokens only.
+    
+    Args:
+        inputs: Tokenized inputs with 'input_ids'.
+        masked_token_indices: List of tensors with indices of masked tokens for each batch element.
+        include_sentence_emb: Whether to concatenate sentence embeddings.
+
+    Returns:
+        masked_log_prob: Summed log-likelihood over masked tokens.
+    """
+    with torch.no_grad():
+        labels = inputs['input_ids']
+        input_ids = inputs['input_ids']
+        embeddings = model.transformer.wte(input_ids).to(device)
+
+        print("Emb size: ", embeddings.size(), "| Sent from mask: ", sentence_embeddings.size(), "| masks: ", len(masked_token_indices))
+
+        # Concatenate token embeddings with expanded sentence embeddings
+        if include_sentence_emb:
+            inputs_embeds = torch.cat([sentence_embeddings, embeddings], dim=1)
+        else:
+            inputs_embeds = embeddings
+
+        # Forward pass
+        outputs = model(inputs_embeds=inputs_embeds)
+
+        logits = outputs.logits  # [batch_size, seq_len, vocab_size]
+        shift_logits = logits[:, :-1, :].contiguous()
+        shift_labels = labels[:, 1:].contiguous()
+
+        # Compute log probabilities
+        log_probs = F.log_softmax(shift_logits, dim=-1)
+        token_log_probs = log_probs.gather(2, shift_labels.unsqueeze(-1)).squeeze(-1)
+
+        # Compute log probabilities for masked tokens per batch sample
+        # masked_token_indices = torch.stack(masked_token_indices)
+        batch_masked_log_prob = []
+        for batch in range(token_log_probs.size(0)):
+            # adjust for the removed sentence embedding
+            adjustment: int = 1 if include_sentence_emb else 2
+            sentence_log_probs = token_log_probs[batch, masked_token_indices[batch]-adjustment].to(device)
+            masked_sentence_log_prob = sentence_log_probs.mean()  # Sum log-probs for this sample
+            batch_masked_log_prob.append(masked_sentence_log_prob)
+        
+        # # Stack results into a tensor
+        batch_masked_log_prob = torch.stack(batch_masked_log_prob)  # Shape: [batch_size]
+
+    return batch_masked_log_prob
+
+
+# Compute log-likelihood for positive and negative samples
+def compute_log_likelihood(
+        inputs, 
+        model,
+        sentence_embeddings,
+        include_sentence_emb: bool = True
+):
+    with torch.no_grad():
+        labels = inputs['input_ids']
+        input_ids = inputs['input_ids']
+        embeddings = model.transformer.wte(input_ids).to(device)
+        
+        print("Emb size: ", embeddings.size())
+        print("Sent from mask: ", sentence_embeddings.size())
+        # Concatenate token embeddings with expanded sentence embeddings
+        if include_sentence_emb:
+            inputs_embeds = torch.cat([sentence_embeddings, embeddings], dim=1)
+        else:
+            inputs_embeds = embeddings
+
+        outputs = model(
+            inputs_embeds=inputs_embeds
+        )
+
+        logits = outputs.logits  # [batch_size, seq_len, vocab_size]
+        shift_logits = logits[:, :-1, :].contiguous()
+        shift_labels = labels[:, 1:].contiguous()
+
+        # Compute log-likelihood
+        log_probs = F.log_softmax(shift_logits, dim=-1)
+        token_log_probs = log_probs.gather(2, shift_labels.unsqueeze(-1)).squeeze(-1)
+        sequence_log_prob = token_log_probs.mean(dim=-1)  # Sum over tokens
+    return sequence_log_prob
+
+
+def intersect1d(tensor1, tensor2):
+            """
+            Custom implementation of torch.intersect1d for PyTorch < 2.0.
+            Finds the intersection of two 1D tensors.
+            """
+            # Get unique values from both tensors
+            tensor1_unique = torch.unique(tensor1)
+            tensor2_unique = torch.unique(tensor2)
+
+            # Find common elements
+            intersection = tensor1_unique[torch.isin(tensor1_unique, tensor2_unique)]
+            return intersection
+
+
 def eval_ll(
         sentence_embeddings_from_mask: torch.TensorType,
         positive_sample_text: torch.TensorType,
@@ -46,7 +153,8 @@ def eval_ll(
         model,
         tokenizer,
         device: torch.device,
-        config: dict
+        config: dict,
+        calculate_probability_for_mask_only: bool = True
     ):
 
     if(not config['use_opt']):
@@ -61,37 +169,65 @@ def eval_ll(
 
     sentence_embeddings = sentence_embeddings_from_mask.unsqueeze(1).to(device)
 
-    # Compute log-likelihood for positive and negative samples
-    def compute_log_likelihood(inputs, include_sentence_emb: bool = True):
-        with torch.no_grad():
-            labels = inputs['input_ids']
-            input_ids = inputs['input_ids']
-            embeddings = model.transformer.wte(input_ids).to(device)
+    if calculate_probability_for_mask_only:
+        # Compare tokens across the batch
+        positive_ids = positive_inputs["input_ids"]  # Shape: [batch_size, seq_len]
+        negative_ids = negative_inputs["input_ids"]  # Shape: [batch_size, seq_len]
+
+        # Find token differences for each pair in the batch
+        batch_size, seq_len = positive_ids.size()
+        
+        positive_masked_token_indices = []
+        negative_masked_token_indices = []
+
+        for i in range(batch_size):
+            # Extract tokens for the current batch element
+            positive_tokens = positive_ids[i]  # Shape: [seq_len]
+            negative_tokens = negative_ids[i]  # Shape: [seq_len]
+
+            # Compute common tokens for the current batch element
+            common_tokens = intersect1d(positive_tokens, negative_tokens)
             
-            print("Emb size: ", embeddings.size())
-            print("Sent from mask: ", sentence_embeddings.size())
-            # Concatenate token embeddings with expanded sentence embeddings
-            if include_sentence_emb:
-                inputs_embeds = torch.cat([sentence_embeddings, embeddings], dim=1)
-            else:
-                inputs_embeds = embeddings
+            # Identify masked tokens (not in common tokens)
+            pos_masked_indices = torch.nonzero(~torch.isin(positive_tokens, common_tokens), as_tuple=True)[0]
+            neg_masked_indices = torch.nonzero(~torch.isin(negative_tokens, common_tokens), as_tuple=True)[0]
 
-            outputs = model(
-                inputs_embeds=inputs_embeds
-            )
+            # Filter out 0 and max_length indices from pos_masked_indices and neg_masked_indices
+            pos_masked_indices = pos_masked_indices[(pos_masked_indices != 0) & (pos_masked_indices >= len(pos_masked_indices) - 1)]
+            neg_masked_indices = neg_masked_indices[(neg_masked_indices != 0) & (neg_masked_indices >= len(neg_masked_indices) - 1)]
 
-            logits = outputs.logits  # [batch_size, seq_len, vocab_size]
-            shift_logits = logits[:, :-1, :].contiguous()
-            shift_labels = labels[:, 1:].contiguous()
 
-            # Compute log-likelihood
-            log_probs = F.log_softmax(shift_logits, dim=-1)
-            token_log_probs = log_probs.gather(2, shift_labels.unsqueeze(-1)).squeeze(-1)
-            sequence_log_prob = token_log_probs.sum(dim=-1)  # Sum over tokens
-        return sequence_log_prob
+            positive_masked_token_indices.append(pos_masked_indices.to(device))
+            negative_masked_token_indices.append(neg_masked_indices.to(device))
 
-    pos_ll = compute_log_likelihood(positive_inputs, include_sentence_emb=config['include_sentence_emb'])
-    neg_ll = compute_log_likelihood(negative_inputs, include_sentence_emb=config['include_sentence_emb'])
+        pos_ll = compute_log_likelihood_over_masked(
+            positive_inputs,
+            model,
+            sentence_embeddings,
+            positive_masked_token_indices,
+            include_sentence_emb=config['include_sentence_emb']
+        )
+        neg_ll = compute_log_likelihood_over_masked(
+            negative_inputs, 
+            model,
+            sentence_embeddings,
+            negative_masked_token_indices,
+            include_sentence_emb=config['include_sentence_emb']
+        )
+
+    else:
+        pos_ll = compute_log_likelihood(
+            positive_inputs, 
+            model,
+            sentence_embeddings,
+            include_sentence_emb=config['include_sentence_emb']
+        )
+        neg_ll = compute_log_likelihood(
+            negative_inputs, 
+            model,
+            sentence_embeddings,
+            include_sentence_emb=config['include_sentence_emb']
+        )
 
     return pos_ll.cpu().tolist(), neg_ll.cpu().tolist()
 
