@@ -61,8 +61,7 @@ sbatch scripts/jobs/detect_dist_difference_leakage.job
 ## Project Structure
 - `scripts/jobs/`: Contains SLURM job scripts
 - `scripts/bashscripts/`: Contains bash execution scripts
-- `LLM_instruct_masking/`: Extension for training data leakage analysis
-- `logs/`: Storage for leakage analysis results
+- `LLM_instruct_masking/`: Folder for masking and alternative sentences generation  with LLM reasoners
 
 ## Notes
 - All SLURM jobs are designed to run on a cluster environment
