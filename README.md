@@ -1,5 +1,21 @@
-# GEIA (Gradient Embedding Inversion Attack)
-A reproducibility study and extension of GEIA - Information Retrieval 2 Course @ UvA
+<h1 align="center">Information Leakage of Sentence Embeddings via GEIA (Gradient Embedding Inversion Attack) 
+  <strong><a href="https://arxiv.org/abs/2504.16609" target="_blank">🗒️Paper</a></strong> </h1> 
+
+<p align="center">
+  <strong> Antonios Tragoudaras</strong><sup>*</sup> &nbsp; | &nbsp;
+  <strong> Theofanis Aslanidis</strong><sup>*</sup> &nbsp; | &nbsp;
+  <strong> Emmanouil Georgios Lionis</strong><sup>*</sup> &nbsp; | &nbsp;
+  <strong> Marina Orozco González</strong><sup>*</sup> &nbsp; | &nbsp;
+  <strong> Panagiotis Eustratiadis </strong>
+</p>
+
+<p align="center"><sup>*</sup>These authors contributed equally</p>
+
+### <p align="center"><strong>SIGIR2025</strong></p>
+
+
+
+
 
 ## Getting Started
 
